@@ -1,0 +1,46 @@
+# Multi30k Task 1 (Flickr30k captions), EN->DE. Development dataset (spec §5, ADR-002).
+# Source: github.com/multi30k/dataset (raw, untokenized, cased).
+# Checksums pinned on 2026-11-15 (trust on first use); prepare_data.py refuses mismatches.
+# Splits: train 29,000 / valid 1,014 (val) / test 1,000 (test_2016_flickr).
+name: multi30k
+task: translation
+seed: 1234
+
+translation:
+  src_lang: en
+  tgt_lang: de
+  root: data            # repository-relative; layout documented in aiayn/data/prepare.py
+
+  downloads:
+    - {split: train, lang: en, compression: gzip, url: "https://raw.githubusercontent.com/multi30k/dataset/master/data/task1/raw/train.en.gz", sha256: d79cfa999dd4c51d2cb42499b6796d5a882c3a8a961923c25a898c90f8bbd56f}
+    - {split: train, lang: de, compression: gzip, url: "https://raw.githubusercontent.com/multi30k/dataset/master/data/task1/raw/train.de.gz", sha256: 726e39b2fa9eb9ffb6dc763fb35a179f80fae06ffc5d28b6ace5faa883de28a6}
+    - {split: valid, lang: en, compression: gzip, url: "https://raw.githubusercontent.com/multi30k/dataset/master/data/task1/raw/val.en.gz", sha256: 14f7d25ddd868909a9213e361768460edcacdd6ab9d1e77b92560dc10c10dc28}
+    - {split: valid, lang: de, compression: gzip, url: "https://raw.githubusercontent.com/multi30k/dataset/master/data/task1/raw/val.de.gz", sha256: f0cba2f995189cf5770f29a8a9a537a3ad3f51657ad873405082ff6863a5e75a}
+    - {split: test, lang: en, compression: gzip, url: "https://raw.githubusercontent.com/multi30k/dataset/master/data/task1/raw/test_2016_flickr.en.gz", sha256: 611d361c6334bc7246101d48097c13cf5c4413c5befc793cc629934359d532d9}
+    - {split: test, lang: de, compression: gzip, url: "https://raw.githubusercontent.com/multi30k/dataset/master/data/task1/raw/test_2016_flickr.de.gz", sha256: 9204244e408ccb38d2a55cfcd344df15005fc42a07a6e55ca6c52b6ababb8cc8}
+
+  filter:
+    max_len: 100        # tensor lengths S = n+1 and T = m+1 (subword tokens)
+    min_len: 1
+    max_len_ratio: null
+
+  tokenizer:            # ADR-005: every key required
+    model_type: bpe
+    vocab_size: 8000
+    character_coverage: 1.0
+    normalization_rule_name: nmt_nfkc
+    input_sentence_size: 0      # 0 = use all sentences (no sampling -> deterministic)
+    num_threads: 1              # single thread for reproducible training
+    hard_vocab_limit: true
+    pad_id: 0
+    unk_id: 1
+    bos_id: 2
+    eos_id: 3
+
+batching:
+  max_tokens: 4096
+  max_sentences: null
+  pool_size: 4096
+  eval_max_tokens: 8192
+  pad_to_multiple_of: 1
+  num_workers: 0

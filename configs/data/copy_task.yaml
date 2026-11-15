@@ -1,0 +1,22 @@
+# Synthetic copy task: the first end-to-end correctness check (spec §5, ADR-009).
+# Content IDs are drawn from [4, vocab_size); IDs 0-3 are PAD/UNK/BOS/EOS.
+name: copy_task
+task: copy
+seed: 1234
+
+copy:
+  mode: copy          # copy | reverse
+  vocab_size: 20      # 4 special + 16 content symbols
+  min_len: 1
+  max_len: 24
+  num_train: 20000
+  num_valid: 1000
+  num_test: 1000
+
+batching:
+  max_tokens: 2048    # bound on len(batch) * max(S, T)
+  max_sentences: null
+  pool_size: 4096
+  eval_max_tokens: null
+  pad_to_multiple_of: 1
+  num_workers: 0      # Windows: >0 uses spawn; keep 0 for small synthetic data

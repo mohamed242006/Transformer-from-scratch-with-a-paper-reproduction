@@ -1,0 +1,14 @@
+# Normalize line endings so Windows and Linux (CI) checkouts produce identical files.
+* text=auto eol=lf
+
+# Windows-only scripts keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary artifacts.
+*.png binary
+*.jpg binary
+*.pdf binary
+*.pt binary
+*.model binary

@@ -1,0 +1,17 @@
+# Beginner configuration (spec §6.2): copy task and Multi30k development runs.
+# 7,577,600 parameters with an 8k joint vocabulary (math.md §9.4).
+name: transformer_tiny
+d_model: 256
+num_heads: 4            # d_k = 64, as in the paper
+d_ff: 1024
+num_encoder_layers: 3
+num_decoder_layers: 3
+dropout: 0.1            # residual + embedding (paper §5.4)
+attention_dropout: 0.0  # ADR-012
+activation_dropout: 0.0 # ADR-012
+norm_position: post     # ADR-003
+positional_encoding: sinusoidal
+max_positions: 1024     # >= data max_len + 50 (inference length bound)
+tie_weights: true
+scale_embedding: true
+layer_norm_eps: 1.0e-5

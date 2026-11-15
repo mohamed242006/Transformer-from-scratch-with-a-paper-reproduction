@@ -1,0 +1,47 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.python-version
+
+# --- Tooling caches ---
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+.coverage
+htmlcov/
+
+# --- Notebooks ---
+.ipynb_checkpoints/
+
+# --- Data (licences forbid redistribution; see data/README.md) ---
+data/*
+!data/README.md
+
+# --- Experiment artifacts (metadata/metrics are tracked, weights are not) ---
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+experiments/**/checkpoints/
+experiments/**/tb/
+runs/
+wandb/
+lightning_logs/
+
+# --- Editors / OS ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- Secrets ---
+.env
+.env.*

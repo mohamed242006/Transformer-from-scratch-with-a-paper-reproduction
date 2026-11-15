@@ -1,0 +1,112 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "aiayn"
+version = "0.1.0.dev0"
+description = "A from-scratch, tested reproduction of 'Attention Is All You Need' (Vaswani et al., 2017) in PyTorch."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "TBD" }
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+# Core runtime dependencies. Model code uses only torch (ADR-001);
+# sentencepiece and sacrebleu are data/evaluation infrastructure (ADR-005, ADR-002).
+dependencies = [
+    "torch>=2.3,<3",
+    "numpy>=1.26",
+    "pyyaml>=6.0",
+    "sentencepiece>=0.2.0",
+    "sacrebleu>=2.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "hypothesis>=6.100",
+    "pytest-cov>=5.0",
+    "ruff==0.17.1",
+    "mypy>=1.10",
+    "types-PyYAML>=6.0",
+    "pre-commit>=3.7",
+]
+tracking = [
+    "wandb>=0.17",
+    "tensorboard>=2.16",
+]
+viz = [
+    "matplotlib>=3.8",
+]
+data = [
+    "datasets>=2.19",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# --------------------------------------------------------------------------- #
+# pytest
+# --------------------------------------------------------------------------- #
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src", "."]  # "." makes `tests.conftest` helpers importable
+addopts = "-ra --strict-markers --strict-config"
+markers = [
+    "parity: numerical parity against PyTorch reference implementations (ADR-004)",
+    "numerical: gradcheck and low-precision stability checks",
+    "integration: multi-component / end-to-end tests",
+    "slow: tests that take more than ~10 seconds",
+    "gpu: tests that require a CUDA device",
+]
+
+# --------------------------------------------------------------------------- #
+# ruff (lint + format)
+# --------------------------------------------------------------------------- #
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle
+    "F",        # pyflakes
+    "I",        # isort
+    "B",        # bugbear
+    "UP",       # pyupgrade
+    "SIM",      # simplify
+    "N",        # naming
+    "RUF",      # ruff-specific
+    "TID",      # tidy imports (absolute imports only, so the layering test is reliable)
+]
+# N812: `import torch.nn.functional as F` is the PyTorch idiom.
+# N806: uppercase math names (Q, K, V, W) inside functions mirror the paper's notation.
+ignore = ["N812", "N806"]
+# Math notation in docstrings mirrors the paper and docs/math.md.
+allowed-confusables = ["γ", "−", "×", "–", "σ", "ρ", "ν"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["aiayn", "tests"]
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.per-file-ignores]
+"notebooks/*" = ["E402"]
+
+# --------------------------------------------------------------------------- #
+# mypy
+# --------------------------------------------------------------------------- #
+[tool.mypy]
+python_version = "3.10"
+packages = ["aiayn"]
+mypy_path = "src"
+strict = true
+warn_unreachable = true
+
+[[tool.mypy.overrides]]
+module = ["sentencepiece.*", "sacrebleu.*", "wandb.*"]
+ignore_missing_imports = true
