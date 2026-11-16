@@ -146,6 +146,7 @@ class _Interval:
     tokens: int = 0
     updates: int = 0
     started: float = field(default_factory=time.perf_counter)
+    paused: float = 0.0  # validation/checkpoint time, excluded from throughput
 
 
 # --------------------------------------------------------------------------- #
@@ -414,6 +415,7 @@ class Trainer:
     @torch.no_grad()
     def validate(self) -> dict[str, float]:
         cfg = self.experiment.train
+        started = time.perf_counter()
         self.model.eval()
         loss = nll = 0.0
         correct = tokens = 0
@@ -456,11 +458,12 @@ class Trainer:
             step=self.progress.update,
             split="valid",
         )
+        self._interval.paused += time.perf_counter() - started
         return metrics
 
     def _log_train(self) -> None:
         iv, now = self._interval, time.perf_counter()
-        elapsed = max(now - iv.started, 1e-9)
+        elapsed = max(now - iv.started - iv.paused, 1e-9)
         nll = iv.nll / iv.tokens
         metrics: dict[str, float | int] = {
             "loss": iv.loss / iv.tokens,
@@ -509,6 +512,7 @@ class Trainer:
             avg_dir = self.ckpt_dir / "avg"
             atomic_save(self.model.state_dict(), avg_dir / f"step_{self.progress.update:08d}.pt")
             prune_snapshots(avg_dir, self.experiment.train.average_last)
+        self._interval.paused += time.perf_counter() - now
         return path
 
     def _dump_nonfinite(self, group: list[Batch], what: str) -> None:

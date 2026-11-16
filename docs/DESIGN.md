@@ -108,7 +108,7 @@ CV bullets only with numbers that exist in `docs/results.md` with linked runs. M
 | 3 ✅ | Core modules + parity tests | Module parity passes |
 | 4 ✅ | Full model | Overfits one batch; full-stack parity |
 | 5 ✅ | Training system | Copy task 100%; Multi30k converges |
-| 6 | Inference + evaluation | First BLEU; beam=1 equals greedy |
+| 6 ✅ | Inference + evaluation | First BLEU; beam=1 equals greedy |
 | 7 | Baselines (+ pin IWSLT14 source) | All baselines through the same pipeline |
 | 8 | IWSLT14 main benchmark | Headline table, 3 seeds, significance |
 | 9 | Ablations | Table-3-style results |

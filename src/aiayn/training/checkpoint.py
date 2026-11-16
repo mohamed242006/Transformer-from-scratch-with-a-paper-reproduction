@@ -104,12 +104,18 @@ def prune_snapshots(directory: Path, keep: int) -> list[Path]:
 
 def capture_rng_state() -> dict[str, Any]:
     """Python, NumPy, torch-CPU and torch-CUDA RNG states in ``weights_only``-safe types."""
-    np_name, np_keys, np_pos, np_has_gauss, np_cached = np.random.get_state(legacy=True)
+    # legacy=True always returns (name, keys, pos, has_gauss, cached_gaussian). NumPy's stubs
+    # type it as a union with a dict, and how they type it changes between NumPy versions, so
+    # narrow explicitly and convert with np.asarray (accepts any input type).
+    np_state: Any = np.random.get_state(legacy=True)
+    if not isinstance(np_state, tuple) or len(np_state) != 5:
+        raise TypeError(f"unexpected NumPy RNG state: {type(np_state).__name__}")
+    np_name, np_keys, np_pos, np_has_gauss, np_cached = np_state
     state: dict[str, Any] = {
         "python": random.getstate(),
         "numpy": {
-            "name": np_name,
-            "keys": torch.from_numpy(np_keys.astype(np.int64)),
+            "name": str(np_name),
+            "keys": torch.from_numpy(np.asarray(np_keys, dtype=np.int64)),
             "pos": int(np_pos),
             "has_gauss": int(np_has_gauss),
             "cached_gaussian": float(np_cached),

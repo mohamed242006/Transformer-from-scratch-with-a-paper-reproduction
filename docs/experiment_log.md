@@ -176,3 +176,27 @@ The validation smoothed loss plateaus at ≈ 0.60, the theoretical floor H(q′)
 **Tests:** 444 passed, 1 skipped (CUDA-only), coverage 89%; ruff and strict mypy clean.
 
 **Next (Week 6):** greedy and beam search (GNMT length penalty), checkpoint averaging, sacreBLEU/chrF evaluation, a first Multi30k run on Kaggle.
+
+---
+
+## 2026-11-16 · Multi30k T4 run analysis + Week 6 · Decoding and evaluation
+
+**Kaggle run `multi30k_tiny` (owner, Tesla T4, fp16, 30 epochs, 3,854 updates):** best validation NLL **1.910 (ppl 6.75)** at update 3,469 (epoch 27); token accuracy 64.5%. The schedule was exactly as configured: peak 7.0e-4 at update 400, then 7e-4·√(400/step). Stable: 0 skipped fp16 steps, loss scale grew 2^16 → 2^17 at update 2,000, gradient norm mostly 0.6–1.5 with brief spikes (max 8.96), memory flat at 923 MiB, steady-state ≈ 62–71k target tokens/s. Validation plateaued after about epoch 20, and the train/valid NLL gap grew from ≈ 0.2 (epoch 10) to ≈ 0.86 (epoch 30): **overfitting is starting, but validation is flat, not rising.** Remedies on the plan: checkpoint averaging, dropout 0.2–0.3 ablation, BLEU-based selection.
+
+**Logging bug found in that log:** intervals spanning an epoch end reported 33–48k tok/s because validation and checkpoint time were inside the throughput timer. Fixed: that time is now excluded.
+
+**Week 6 done:** greedy + batched beam search with GNMT length penalty, forced EOS at input + 50, never PAD/BOS (ADR-019) · checkpoint averaging · `Translator.from_run` (best/last/averaged/path) · `evaluate_run` + `scripts/evaluate.py`: cased sacreBLEU with signature, lowercased BLEU, chrF, exact match, BLEU by length · `scripts/translate.py`, `scripts/average_checkpoints.py` · evaluation cell in `kaggle_train.ipynb` · layering: `inference` may import `evaluation`; `sacrebleu` only in `evaluation`.
+
+**Copy-task test set (1,000 sentences, CPU, Week 5 run):**
+| Checkpoint | Search | Exact match | BLEU |
+|---|---|---|---|
+| best | greedy | 99.3% | 99.94 |
+| best | beam 4 (first version: stop after k finished) | 93.7% | 98.44 |
+| best | **beam 4 (exact stopping rule)** | **99.4%** | **99.95** |
+| averaged (500/1000/1500) | beam 4 | 97.1% | 99.65 |
+
+**Findings**
+1. **Beam-search stopping bug:** stopping a sentence once *k* hypotheses had finished truncated outputs (all 63 errors were too short). Short EOS candidates from the strong path kept ranking within the top *k*, because the alternatives were even worse. Fixed with an exact rule: stop when the best finished normalized score ≥ `best_live / lp(limit)`. Beam search now matches brute-force exhaustive search (α ∈ {0, 0.6, 1}) and equals greedy at k = 1, α = 0.
+2. **Averaging across the whole run hurts** when early snapshots are under-trained (97.1% vs 99.4%). Average plateau checkpoints only. The Multi30k config's last-5 × 500 updates covers the plateau.
+
+**Next:** run the evaluation on the Kaggle Multi30k run (owner) → first real BLEU. Then Week 7 (RNN baselines, IWSLT14 source).

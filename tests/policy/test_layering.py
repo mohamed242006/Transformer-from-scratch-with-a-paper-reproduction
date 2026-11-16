@@ -30,14 +30,14 @@ ALLOWED: dict[str, set[str]] = {
     "data": {"utils"},
     "evaluation": {"utils"},
     "tracking": {"utils"},
-    "inference": {"models", "modules", "data", "utils"},
+    "inference": {"models", "modules", "data", "evaluation", "utils"},
     "training": ALL - {"training", "diagnostics"},
     # Platform validation/packaging sits on top of everything; nothing imports it.
     "diagnostics": ALL - {"diagnostics"},
 }
 
 # Third-party modules restricted to specific packages.
-RESTRICTED_THIRD_PARTY = {"sentencepiece": {"data"}}
+RESTRICTED_THIRD_PARTY = {"sentencepiece": {"data"}, "sacrebleu": {"evaluation"}}
 
 
 def _imports(path: Path) -> list[tuple[int, str]]:

@@ -2,7 +2,7 @@
 
 A from-scratch PyTorch implementation and reproduction of the original Transformer (Vaswani et al., 2017). The goal is not just to train a model but to **demonstrate and verify** every component: hand-written modules, numerical parity with PyTorch's reference implementations, fair RNN baselines, paper-style ablations with multiple seeds, and honest metric reporting.
 
-> **Status: Week 5 of 11 complete (training system).** Label-smoothed loss, Noam/inverse-sqrt schedules, fp16 AMP with GradScaler, gradient accumulation, atomic checkpoints and **bit-exact resumption** across Kaggle sessions, plus JSONL/TensorBoard/W&B logging. Validated on a Kaggle Tesla T4: the IWSLT-size model trains at ≈ 25k target tokens/s within 2.2 GB of VRAM ([docs/KAGGLE.md](docs/KAGGLE.md)).
+> **Status: Week 6 of 11 complete (decoding and evaluation).** Greedy and beam search (GNMT length penalty, exact stopping rule, verified against brute-force search), checkpoint averaging, a translation API and a sacreBLEU/chrF evaluation pipeline, on top of the resumable fp16 training system validated on a Kaggle T4 ([docs/KAGGLE.md](docs/KAGGLE.md)).
 
 ## What makes this different from a tutorial
 | | |
@@ -32,7 +32,7 @@ A from-scratch PyTorch implementation and reproduction of the original Transform
 | 3 ✅ | Core modules + parity tests |
 | 4 ✅ | Full model + invariance tests |
 | 5 ✅ | Training system |
-| 6 | Inference + evaluation |
+| 6 ✅ | Inference + evaluation |
 | 7 | RNN baselines |
 | 8 | IWSLT14 main benchmark (3 seeds, Kaggle) |
 | 9 | Ablations |
@@ -48,6 +48,7 @@ python scripts/inspect_data.py   --config configs/data/multi30k.yaml --split val
 python scripts/count_params.py   --config configs/model/transformer_base.yaml --vocab-size 37000
 python scripts/train.py --experiment configs/experiment/copy_task_small.yaml --run-dir runs/copy   # ~100% in minutes on CPU
 python scripts/train.py --resume runs/copy --override train.max_updates=2000                     # exact continuation
+python scripts/evaluate.py --run-dir runs/copy --greedy                                          # sacreBLEU, chrF, exact match
 ```
 
 ## Development setup

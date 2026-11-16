@@ -58,7 +58,8 @@ Status markers: **[W1]** created in Week 1 · *(Wn)* populated in that week.
 ├── notebooks/                      [W5] kaggle_validate.ipynb, kaggle_train.ipynb · (later) analysis
 │
 ├── scripts/                        [W2–W5] prepare_data, train_tokenizer, inspect_data, count_params,
-│                                   kaggle_validate, package_for_kaggle, train
+│                                   kaggle_validate, package_for_kaggle, train, evaluate,
+│                                   translate, average_checkpoints
 ├── dist/                           (gitignored) build output: dist/kaggle/ dataset bundles (ADR-016)
 │
 ├── src/
@@ -72,8 +73,8 @@ Status markers: **[W1]** created in Week 1 · *(Wn)* populated in that week.
 │       ├── data/                   [W2] special_tokens, example (framing), config (schema), tokenizer,
 │       │                                copy_task, datasets, sampler, collate, prepare, loading
 │       ├── training/               [W5] config, experiment, losses, schedule, checkpoint, trainer
-│       ├── inference/              [W1] (W6) greedy, beam search, checkpoint averaging, translate API
-│       ├── evaluation/             [W1] (W6) BLEU/chrF wrappers, perplexity, length-bucket analysis
+│       ├── inference/              [W6] decoding (greedy, beam), averaging, translator, evaluate
+│       ├── evaluation/             [W6] metrics: sacreBLEU, lowercased BLEU, chrF, exact match, by-length
 │       ├── tracking/               [W5] loggers.py: stdout, jsonl (source of truth), TensorBoard, W&B
 │       └── diagnostics/            [W5-prep] Kaggle validation (validation.py, report.py), packaging.py
 │
@@ -116,7 +117,7 @@ Dependencies point **downwards only**. Lower layers never import higher ones.
 | `data` | `utils`, sentencepiece, datasets | `modules`, `models`, `training`, `inference` |
 | `evaluation` | `utils`, sacrebleu | `modules`, `models`, `training` |
 | `tracking` | `utils`, wandb/tensorboard (optional) | `modules`, `models`, `data`, `training` |
-| `inference` | `models`, `modules`, `data`, `utils` | `training` |
+| `inference` | `models`, `modules`, `data`, `evaluation`, `utils` | `training` (ADR-019: the evaluation pipeline decodes, then scores) |
 | `training` | `models`, `data`, `evaluation`, `tracking`, `inference`, `utils` | none of the above restrictions |
 | `diagnostics` | everything (platform validation and packaging sit on top) | — (nothing may import `diagnostics`) |
 

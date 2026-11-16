@@ -24,11 +24,12 @@ An ADR records **one** significant decision: the forces that shaped it, what was
 | [ADR-016](ADR-016-kaggle-code-and-data-delivery.md) | Deliver code and data to Kaggle as private Kaggle Datasets with a content manifest | Accepted (amended) | 2026-11-15 |
 | [ADR-017](ADR-017-loss-and-update-semantics.md) | Loss, normalization and optimizer-update semantics | Accepted | 2026-11-16 |
 | [ADR-018](ADR-018-experiment-composition.md) | Experiment composition, compatibility checks and resume-safe config hashing | Accepted | 2026-11-16 |
+| [ADR-019](ADR-019-decoding-and-evaluation.md) | Decoding, checkpoint averaging and the evaluation pipeline | Accepted | 2026-11-16 |
 
 ### Planned ADRs (not yet written)
 | Planned | Topic | Target week |
 |---|---|---|
-| ADR-019 | Decoding: greedy and beam search (GNMT length penalty), checkpoint averaging | Week 6 |
+| ADR-020 | IWSLT14 source pinning and preprocessing; RNN baseline fairness protocol | Week 7 |
 
 ## Lifecycle
 `Proposed` → `Accepted` → (`Deprecated` | `Superseded by ADR-XXX`)

@@ -162,3 +162,12 @@ python scripts/train.py --resume /kaggle/input/<output>/runs/multi30k_tiny_s1 --
 ```
 Only `train.{max_updates, max_epochs, time_budget_minutes, log_every, loggers, device}` may change on resume (ADR-018); any other change is refused.
 
+### Evaluation (Week 6)
+The training notebook's last cell evaluates the test set after a completed run:
+```bash
+python scripts/evaluate.py --run-dir /kaggle/working/runs/multi30k_tiny_s1                         # best, beam 4
+python scripts/evaluate.py --run-dir /kaggle/working/runs/multi30k_tiny_s1 --checkpoint averaged   # last 5 snapshots
+python scripts/evaluate.py --run-dir /kaggle/working/runs/multi30k_tiny_s1 --greedy
+```
+Results are written to `runs/<id>/eval/*.json` (cased sacreBLEU with signature, lowercased BLEU, chrF, BLEU by source length, decode time) and `*.hyp`. For an **already finished** run from an earlier session, attach that output and run the same commands on `/kaggle/input/<output>/runs/<id>` copied to `/kaggle/working`. Evaluation needs no training state, only `config.yaml`, `tokenizer/` and the checkpoints.
+
