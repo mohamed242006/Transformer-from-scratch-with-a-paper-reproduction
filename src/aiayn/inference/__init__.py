@@ -18,6 +18,7 @@ from aiayn.inference.decoding import (
     length_penalty,
 )
 from aiayn.inference.evaluate import evaluate_run
+from aiayn.inference.report import build_run_report, write_run_report
 from aiayn.inference.translator import RunInfo, Translator, load_run
 
 __all__ = [
@@ -28,10 +29,12 @@ __all__ = [
     "average_checkpoint_files",
     "average_state_dicts",
     "beam_search",
+    "build_run_report",
     "evaluate_run",
     "greedy_decode",
     "length_penalty",
     "load_run",
     "load_weights",
     "snapshot_paths",
+    "write_run_report",
 ]

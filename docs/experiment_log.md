@@ -200,3 +200,13 @@ The validation smoothed loss plateaus at ≈ 0.60, the theoretical floor H(q′)
 2. **Averaging across the whole run hurts** when early snapshots are under-trained (97.1% vs 99.4%). Average plateau checkpoints only. The Multi30k config's last-5 × 500 updates covers the plateau.
 
 **Next:** run the evaluation on the Kaggle Multi30k run (owner) → first real BLEU. Then Week 7 (RNN baselines, IWSLT14 source).
+
+---
+
+## 2026-11-16 · Lost Kaggle run and run-persistence workflow
+
+**What happened:** the Multi30k T4 run (`20261116-175603_multi30k_tiny_s1`) completed, but its run directory was lost: the interactive Kaggle session ended before a version was saved. Only the console log survived (analysis recorded above). Without weights, no BLEU.
+
+**Decision: re-run, don't skip.** The re-run costs ≈ 4–5 min of training + 1–2 min of evaluation on a T4 (from the measured 67k tok/s), under 1% of a weekly quota. It produces the first real-data BLEU (Week 6's open exit criterion) and the Transformer reference that Week 7's RNN baselines are compared against. Same seed and config, so its best validation NLL should land close to the lost run's 1.910, which doubles as a reproducibility check. Skipping to Week 7 would leave decoding and evaluation unverified on real text.
+
+**Workflow change (ADR-020):** commit-mode training notebook (train → evaluate → `REPORT.md` → publish) · private `aiayn-runs` dataset updated each session via the Kaggle CLI (notebook secrets) · stable `RUN_NAME` + auto-resume from any attached input (zips included) · `scripts/report.py`, `scripts/kaggle_publish_runs.py`, `aiayn.diagnostics.kaggle_runs`, `aiayn.inference.report`.

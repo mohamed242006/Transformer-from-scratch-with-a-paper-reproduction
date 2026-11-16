@@ -171,3 +171,28 @@ python scripts/evaluate.py --run-dir /kaggle/working/runs/multi30k_tiny_s1 --gre
 ```
 Results are written to `runs/<id>/eval/*.json` (cased sacreBLEU with signature, lowercased BLEU, chrF, BLEU by source length, decode time) and `*.hyp`. For an **already finished** run from an earlier session, attach that output and run the same commands on `/kaggle/input/<output>/runs/<id>` copied to `/kaggle/working`. Evaluation needs no training state, only `config.yaml`, `tokenizer/` and the checkpoints.
 
+
+## 9. Preserving runs between sessions (ADR-020)
+**Lesson learned:** the first Multi30k run was lost because the interactive session ended before a version was saved. On Kaggle, `/kaggle/working` survives only when the notebook runs as **Save Version → Save & Run All (Commit)**.
+
+**One-time setup** (for the second, independent copy):
+1. kaggle.com → *Settings → API → Create New Token* (downloads `kaggle.json` with `username` and `key`).
+2. In the training notebook: *Add-ons → Secrets* → add `KAGGLE_USERNAME` and `KAGGLE_KEY` with those values, and enable both for the notebook.
+
+**Every session** (`notebooks/kaggle_train.ipynb`, unchanged parameters except `EXPERIMENT`/`RUN_NAME`):
+1. *Add Input*: the previous version's output and/or your `aiayn-runs` dataset (if they exist).
+2. **Save Version → Save & Run All (Commit).** The notebook then:
+   - auto-resumes `RUN_NAME` from the most advanced copy found in `/kaggle/input/**` (or starts a new run);
+   - trains until completion or the 11.5 h budget (exit code 3 = resumable);
+   - for a completed run, evaluates the test set (best beam 4, averaged beam 4, best greedy) and writes `runs/<RUN_NAME>/REPORT.md`;
+   - publishes `runs/<RUN_NAME>` (minus `last.prev.pt`) as a new version of the **private** dataset `<user>/aiayn-runs`, carrying over the other runs already in the attached dataset.
+3. Copies that exist after the session: the commit output **and** `aiayn-runs`. Either one is enough to resume or re-evaluate.
+
+| What | Where it is preserved |
+|---|---|
+| Checkpoints (`last.pt`, `best.pt`, `avg/`) | commit output + `aiayn-runs` |
+| Run directory (`config.yaml`, `metadata.json`, `metrics.jsonl`, `tokenizer/`) | commit output + `aiayn-runs` |
+| Evaluation outputs (`eval/*.json`, `eval/*.hyp`) | commit output + `aiayn-runs` |
+| BLEU report (`REPORT.md`) | commit output + `aiayn-runs` |
+
+Manual equivalents: `python scripts/report.py --run-dir <run>` and `python scripts/kaggle_publish_runs.py --run <run> --user <you> [--previous /kaggle/input/aiayn-runs] [--dry-run]`.

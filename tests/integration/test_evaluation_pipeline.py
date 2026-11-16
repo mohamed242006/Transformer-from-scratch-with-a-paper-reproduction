@@ -83,3 +83,27 @@ def test_translation_run_end_to_end(corpus_dir: Path, tmp_path: Path) -> None:
     result = evaluate_run(run_dir, split="test", decode=DecodeConfig(beam_size=2), device="cpu")
     assert result["sentences"] == 60  # every raw test line, unfiltered
     assert 0.0 <= result["bleu"] <= 100.0 and "case:mixed" in result["bleu_signature"]
+
+
+def test_report_summarizes_training_and_evaluations(copy_run: Path) -> None:
+    from aiayn.inference import write_run_report
+
+    evaluate_run(
+        copy_run, split="test", decode=DecodeConfig(beam_size=1, max_len_b=12), device="cpu"
+    )
+    report = write_run_report(copy_run).read_text(encoding="utf-8")
+    assert report.startswith(f"# Run report: `{copy_run.name}`")
+    assert "## Sessions" in report and "| 1 |" in report
+    assert "test | best | greedy" in report and "sacreBLEU signature" in report
+    assert "BLEU by source length" in report
+
+
+def test_report_before_any_evaluation(tmp_path: Path) -> None:
+    import shutil
+
+    from aiayn.inference import build_run_report
+
+    run = tmp_path / "fresh"
+    Trainer.create(make_experiment(max_updates=2), run).train()
+    shutil.rmtree(run / "eval", ignore_errors=True)
+    assert "No evaluation yet" in build_run_report(run)
