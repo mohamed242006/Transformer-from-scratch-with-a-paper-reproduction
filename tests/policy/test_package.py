@@ -19,6 +19,7 @@ SUBPACKAGES = [
     "aiayn.inference",
     "aiayn.evaluation",
     "aiayn.tracking",
+    "aiayn.diagnostics",
 ]
 
 

@@ -125,3 +125,19 @@ Entry format: date · week · what was done · findings · decisions · next ste
 3. Layer and stack parity (Post-LN and Pre-LN, fp64 and fp32, forward and backward) passed on the first run. PyTorch's references were built without stack norms for Post-LN, as ADR-003 requires.
 
 **Next (Week 5):** ADR-016 loss · ADR-017 experiment composition · trainer with ADR-013 resumability · Noam schedule · implement the Kaggle validation notebook.
+
+---
+
+## 2026-11-15 · Pre-Week-5 · Kaggle validation workflow
+
+**Done:** `aiayn.diagnostics` (validation checks, JSON report, packaging) · `scripts/kaggle_validate.py` · `scripts/package_for_kaggle.py` · `notebooks/kaggle_validate.ipynb` · [KAGGLE.md](KAGGLE.md) · [ADR-016](decisions/ADR-016-kaggle-code-and-data-delivery.md) (code and data as private Kaggle Datasets with a content tree hash, since the project has no git repository).
+
+**Local results (CPU, real Multi30k):** all critical checks pass. Tokenizer fingerprint `f04bec59…` matches Week 2, round-trip 200/200, and a retrained tokenizer is identical. Exact parameter counts (tiny 7,577,600; iwslt 35,639,296 at V = 8k). Initial CE inside the ln V band. VRAM estimates for the worst-case step at 4096 tokens/side: tiny ≈ 1.1 GiB, iwslt ≈ 3.5 GiB (KAGGLE.md §5). **Kaggle dry run** (code and data run from the packaged bundles, internet check off): 93 preflight tests pass, validation OK in 39 s.
+
+**Findings**
+1. **Packaging bug caught by the dry run:** the exclusion pattern `data` matched every path component, silently dropping the `aiayn.data` package and `configs/data/` from the code bundle. Fixed by anchoring root-only excludes; a regression test now checks that every module, config, script and test is shipped.
+2. Running the VRAM estimate's worst-case batch with bf16 autocast on a CPU without native bf16 took > 10 min. Activations are linear in the number of sentences at a fixed length, so the estimate now measures a 2-sentence slice and scales it. On GPU the peak is measured directly.
+3. Walking `.venv` made packaging slow (7–10 s); directory pruning brought it to 0.04 s.
+4. The file-writing toolchain again turned an escape (`\n`) inside generated notebook code into a real newline. The generator now syntax-checks every code cell; the faulty cell was rewritten without escapes.
+
+**Next:** run the notebook on a Kaggle T4 (owner) → record measured VRAM and throughput here → Week 5.

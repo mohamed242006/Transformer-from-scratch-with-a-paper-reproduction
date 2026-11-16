@@ -21,7 +21,8 @@ A from-scratch PyTorch implementation and reproduction of the original Transform
 | [docs/decisions/](docs/decisions/README.md) | Architecture Decision Records |
 | [docs/REPOSITORY.md](docs/REPOSITORY.md) | Folder contracts, ownership, import layering |
 | [docs/experiment_log.md](docs/experiment_log.md) | Chronological lab notebook |
-| [docs/kaggle_validation_notebook.md](docs/kaggle_validation_notebook.md) | Design of the Kaggle environment/GPU/data/model/checkpoint validation notebook |
+| [docs/KAGGLE.md](docs/KAGGLE.md) | Running on Kaggle: setup, dataset packaging, validation notebook, expected VRAM |
+| [docs/kaggle_validation_notebook.md](docs/kaggle_validation_notebook.md) | Design of the Kaggle validation checks |
 
 ## Plan
 | Week | Milestone |

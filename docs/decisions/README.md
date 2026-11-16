@@ -20,14 +20,14 @@ An ADR records **one** significant decision: the forces that shaped it, what was
 | [ADR-012](ADR-012-dropout-locations.md) | Dropout locations and defaults (paper text first, else 0.0) | Accepted | 2026-11-15 |
 | [ADR-013](ADR-013-run-artifacts-and-resumption.md) | Run artifacts, checkpointing and resumption on Kaggle | Accepted | 2026-11-15 |
 | [ADR-014](ADR-014-numerical-precision.md) | Numerical precision policy (fp16 on Kaggle GPUs, fp32 reductions) | Accepted | 2026-11-15 |
-
 | [ADR-015](ADR-015-model-assembly.md) | Model assembly: boundaries, weight tying, attention-weight retention, initialization | Accepted | 2026-11-15 |
+| [ADR-016](ADR-016-kaggle-code-and-data-delivery.md) | Deliver code and data to Kaggle as private Kaggle Datasets with a content manifest | Accepted | 2026-11-15 |
 
 ### Planned ADRs (not yet written)
 | Planned | Topic | Target week |
 |---|---|---|
-| ADR-016 | Loss: label-smoothed CE (ε/K), per-token normalization, fp32 reduction | Week 5 |
-| ADR-017 | Experiment composition (data + model + train groups) and config-compatibility checks | Week 5 |
+| ADR-017 | Loss: label-smoothed CE (ε/K), per-token normalization, fp32 reduction | Week 5 |
+| ADR-018 | Experiment composition (data + model + train groups) and config-compatibility checks | Week 5 |
 
 ## Lifecycle
 `Proposed` → `Accepted` → (`Deprecated` | `Superseded by ADR-XXX`)

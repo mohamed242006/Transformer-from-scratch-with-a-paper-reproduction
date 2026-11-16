@@ -1,6 +1,6 @@
 # Kaggle Validation Notebook: Design
 
-- **Status:** Design (Week 4). Implementation is scheduled with the trainer (Week 5), because check 7 needs the ADR-013 checkpoint format.
+- **Status:** **Implemented** (pre-Week-5): `aiayn.diagnostics`, `scripts/kaggle_validate.py`, `notebooks/kaggle_validate.ipynb`. Usage: [KAGGLE.md](KAGGLE.md). Differences from this design: code arrives as a Kaggle Dataset with a tree hash instead of a git commit (ADR-016), and **cell 7 (checkpoint loading) is deferred to Week 5**, when the ADR-013 checkpoint format exists. The original design follows for reference.
 - **Related:** [ADR-010](decisions/ADR-010-compute-platform.md), [ADR-013](decisions/ADR-013-run-artifacts-and-resumption.md), [ADR-014](decisions/ADR-014-numerical-precision.md), [ADR-004](decisions/ADR-004-parity-testing.md)
 
 ## 1. Purpose

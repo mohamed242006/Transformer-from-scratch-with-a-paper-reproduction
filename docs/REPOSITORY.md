@@ -47,16 +47,19 @@ Status markers: **[W1]** created in Week 1 · *(Wn)* populated in that week.
 │   ├── paper_notes.md              [W1]
 │   ├── math.md                     [W1]
 │   ├── experiment_log.md           [W1] chronological lab notebook
-│   ├── kaggle_validation_notebook.md [W4] validation notebook design (implemented W5)
+│   ├── KAGGLE.md                   [W5p] Kaggle setup, packaging, validation, expected VRAM
+│   ├── kaggle_validation_notebook.md [W4] validation check design (implemented W5p)
 │   ├── decisions/                  [W1] ADRs (index in decisions/README.md)
 │   ├── figures/                    [W1] (W9+) final figures referenced by docs/README
 │   └── results.md                  (W10) final results report
 │
 ├── experiments/                    [W1] (W5+) one folder per run: metadata + metrics, no weights in git
 │
-├── notebooks/                      [W1] (W3+) explanation and analysis notebooks
+├── notebooks/                      [W5p] kaggle_validate.ipynb · (later) analysis notebooks
 │
-├── scripts/                        [W2/W4] prepare_data, train_tokenizer, inspect_data, count_params
+├── scripts/                        [W2–W5p] prepare_data, train_tokenizer, inspect_data, count_params,
+│                                   kaggle_validate, package_for_kaggle
+├── dist/                           (gitignored) build output: dist/kaggle/ dataset bundles (ADR-016)
 │
 ├── src/
 │   └── aiayn/                      [W1] installable package ("Attention Is All You Need")
@@ -71,7 +74,8 @@ Status markers: **[W1]** created in Week 1 · *(Wn)* populated in that week.
 │       ├── training/               [W1] (W5) trainer, losses, schedulers, checkpointing
 │       ├── inference/              [W1] (W6) greedy, beam search, checkpoint averaging, translate API
 │       ├── evaluation/             [W1] (W6) BLEU/chrF wrappers, perplexity, length-bucket analysis
-│       └── tracking/               [W1] (W5) Logger interface + W&B/TensorBoard/stdout backends
+│       ├── tracking/               [W1] (W5) Logger interface + W&B/TensorBoard/stdout backends
+│       └── diagnostics/            [W5-prep] Kaggle validation (validation.py, report.py), packaging.py
 │
 └── tests/                          [W1]
     ├── conftest.py                 [W2] synthetic corpora, tiny tokenizer config, CharTokenizer
@@ -114,6 +118,7 @@ Dependencies point **downwards only**. Lower layers never import higher ones.
 | `tracking` | `utils`, wandb/tensorboard (optional) | `modules`, `models`, `data`, `training` |
 | `inference` | `models`, `modules`, `data`, `utils` | `training` |
 | `training` | `models`, `data`, `evaluation`, `tracking`, `inference`, `utils` | none of the above restrictions |
+| `diagnostics` | everything (platform validation and packaging sit on top) | — (nothing may import `diagnostics`) |
 
 Enforcement: an AST-based layering test in `tests/policy/` (added in Week 2, when the first cross-package import exists).
 
@@ -228,6 +233,12 @@ Each entry lists **Owner**, **Responsibilities**, **Acceptable contents** and **
 - **Responsibilities:** a `Logger` protocol with stdout, TensorBoard and W&B backends; run metadata capture (git hash, environment).
 - **Acceptable:** thin adapters; optional dependencies imported lazily.
 - **Forbidden:** metric computation; hard dependencies on W&B (the project must run fully offline).
+
+### `src/aiayn/diagnostics/`
+- **Owner:** Infra owner
+- **Responsibilities:** platform validation for Kaggle and local machines (environment, dependencies, CUDA, data, tokenizer, model, VRAM, throughput) and Kaggle Dataset packaging (ADR-016).
+- **Acceptable:** check functions returning `Outcome`, report serialization, packaging helpers.
+- **Forbidden:** training logic (it belongs in `training/`); being imported by any other package; network access other than the optional reachability probe and pinned downloads.
 
 ### `tests/`
 - **Owner:** shared. Each test directory mirrors the owner of the code under test. `policy/` belongs to the Infra owner.

@@ -11,7 +11,17 @@ from pathlib import Path
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[2] / "src" / "aiayn"
 
-ALL = {"utils", "modules", "models", "data", "evaluation", "tracking", "inference", "training"}
+ALL = {
+    "utils",
+    "modules",
+    "models",
+    "data",
+    "evaluation",
+    "tracking",
+    "inference",
+    "training",
+    "diagnostics",
+}
 
 ALLOWED: dict[str, set[str]] = {
     "utils": set(),
@@ -21,7 +31,9 @@ ALLOWED: dict[str, set[str]] = {
     "evaluation": {"utils"},
     "tracking": {"utils"},
     "inference": {"models", "modules", "data", "utils"},
-    "training": ALL - {"training"},
+    "training": ALL - {"training", "diagnostics"},
+    # Platform validation/packaging sits on top of everything; nothing imports it.
+    "diagnostics": ALL - {"diagnostics"},
 }
 
 # Third-party modules restricted to specific packages.
