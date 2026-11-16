@@ -141,3 +141,38 @@ Entry format: date · week · what was done · findings · decisions · next ste
 4. The file-writing toolchain again turned an escape (`\n`) inside generated notebook code into a real newline. The generator now syntax-checks every code cell; the faulty cell was rewritten without escapes.
 
 **Next:** run the notebook on a Kaggle T4 (owner) → record measured VRAM and throughput here → Week 5.
+
+---
+
+## 2026-11-16 · Kaggle validation results + Week 5 · Training system
+
+**Kaggle validation (owner's run, Tesla T4, Python 3.13):** all checks passed except `env.python`. Analysis: the validator hard-coded Python 3.10–3.12 (the CI matrix at the time), while `pyproject.toml` requires only ≥ 3.10 and the preflight test suites had passed on 3.13. **It was a validator assumption, not a real incompatibility.** Fix: fail below 3.10, pass for CI-tested 3.10–3.13, warn for newer; CI matrix extended to 3.13.
+
+| Model | Peak VRAM (worst-case step, 4096 tok/side) | CPU-based estimate | Throughput (fp16, real batches) |
+|---|---|---|---|
+| transformer_tiny | **898 MiB** | 1,084 MiB | **78,808 tgt tok/s** |
+| transformer_iwslt | **2,243 MiB** | 3,618 MiB | **24,669 tgt tok/s** |
+
+Training settings and time estimates derived from these numbers are in [KAGGLE.md §7](KAGGLE.md).
+
+**Week 5 done:** label-smoothed loss (ADR-017) · Noam / inverse-sqrt / constant schedules · `TrainConfig` + experiment composition and config hash (ADR-018) · trainer with fp16 autocast + GradScaler (skipped updates not counted), gradient accumulation with per-update token normalization, gradient-norm logging/clipping, non-finite guard, validation (loss/NLL/perplexity/accuracy), best checkpoint, averaging snapshots, session time budget, SIGTERM/SIGINT clean stop · atomic checkpoints with `last.prev.pt` fallback, `weights_only` loading, RNG capture · stdout / JSONL / TensorBoard / W&B loggers · `scripts/train.py` · `notebooks/kaggle_train.ipynb` · `kaggle_validate.py --check-training-resume`.
+
+**Findings**
+1. **`DataLoader` consumes the global torch RNG on every iterator creation**, even with zero workers. A resumed run would therefore shift every later dropout mask. Fix: dedicated `generator=` per loader (`build_dataloader(..., generator=...)`). Verified by bit-identical resumption tests.
+2. **Resumption is bit-identical on CPU,** including a session budget that stops after *every single update* (12+ resumes): per-update losses and final weights equal the uninterrupted run exactly.
+3. `torch.__version__` is a `TorchVersion` object, so a checkpoint containing it could not be loaded with `weights_only=True`. Caught by the first resume smoke test; stored as `str`.
+4. YAML 1.1 parses `amp: off` as the boolean `False`, which the strict config loader rejected. The mode is renamed `fp32`.
+5. The loss converted logits with `.float()`, which **downcasts float64** (the same bug class as Week 4's sinusoid table). Now uses `promote_types(dtype, float32)`; regression test added.
+6. Resuming in a fresh Kaggle session needs the data re-prepared (the clone has no `data/`). `train.py --resume --prepare-data` downloads and verifies the data but keeps the run's own tokenizer.
+
+**Week 5 exit criterion: copy task** (`copy_task_small`, laptop CPU, 1,500 updates, ≈ 22 min with the CPU shared by the test suite):
+
+| Update | 250 | 500 | 750 | 1,000 | 1,250 | 1,500 |
+|---|---|---|---|---|---|---|
+| Held-out token accuracy | 74.3% | 98.2% | 99.6% | **99.99%** | 99.7% | 99.9% |
+
+The validation smoothed loss plateaus at ≈ 0.60, the theoretical floor H(q′) ≈ 0.594 for K = 20, ε = 0.1 (math.md §8.4): an independent check of the loss implementation. Sequence-level exact match needs greedy decoding (Week 6).
+
+**Tests:** 444 passed, 1 skipped (CUDA-only), coverage 89%; ruff and strict mypy clean.
+
+**Next (Week 6):** greedy and beam search (GNMT length penalty), checkpoint averaging, sacreBLEU/chrF evaluation, a first Multi30k run on Kaggle.

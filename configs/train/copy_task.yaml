@@ -1,0 +1,12 @@
+# Copy task: converges to ~100% teacher-forced token accuracy in minutes on CPU.
+name: copy_task
+seed: 1
+max_updates: 1500
+label_smoothing: 0.1
+amp: auto
+schedule: {kind: inverse_sqrt, warmup_steps: 200, peak_lr: 1.0e-3}
+log_every: 50
+validate_every: 250
+save_every: 500
+average_last: 3
+loggers: [stdout, jsonl]

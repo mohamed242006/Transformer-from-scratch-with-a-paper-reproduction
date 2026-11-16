@@ -1,6 +1,6 @@
 # Kaggle Validation Notebook: Design
 
-- **Status:** **Implemented** (pre-Week-5): `aiayn.diagnostics`, `scripts/kaggle_validate.py`, `notebooks/kaggle_validate.ipynb`. Usage: [KAGGLE.md](KAGGLE.md). Differences from this design: code arrives as a Kaggle Dataset with a tree hash instead of a git commit (ADR-016), and **cell 7 (checkpoint loading) is deferred to Week 5**, when the ADR-013 checkpoint format exists. The original design follows for reference.
+- **Status:** **Implemented** (pre-Week-5): `aiayn.diagnostics`, `scripts/kaggle_validate.py`, `notebooks/kaggle_validate.ipynb`. Usage: [KAGGLE.md](KAGGLE.md). Differences from this design: code arrives as a Kaggle Dataset with a tree hash instead of a git commit (ADR-016), and cell 7 (checkpoint loading) was implemented in Week 5 as the `training.resume` check (`--check-training-resume`): a small model trains uninterrupted and interrupted + resumed on the GPU, and the per-update losses are compared. The original design follows for reference.
 - **Related:** [ADR-010](decisions/ADR-010-compute-platform.md), [ADR-013](decisions/ADR-013-run-artifacts-and-resumption.md), [ADR-014](decisions/ADR-014-numerical-precision.md), [ADR-004](decisions/ADR-004-parity-testing.md)
 
 ## 1. Purpose

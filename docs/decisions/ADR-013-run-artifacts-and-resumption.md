@@ -1,6 +1,6 @@
 # ADR-013: Run artifacts, checkpointing and resumption on Kaggle
 
-- **Status:** Accepted (design). Data-side pieces implemented in Week 3; trainer side is a Week 5 requirement.
+- **Status:** Accepted. **Implemented**: data side in Week 3, trainer side in Week 5 (`aiayn.training.checkpoint`, `aiayn.training.trainer`). Bit-exact resumption is verified on CPU, including interruption after every update; the GPU check is `kaggle_validate.py --check-training-resume`.
 - **Date:** 2026-11-15
 - **Deciders:** Lead engineer, project owner
 - **Related:** [ADR-010](ADR-010-compute-platform.md), [ADR-005](ADR-005-sentencepiece-tokenization.md), [ADR-009](ADR-009-sequence-framing-and-batching.md), [ADR-014](ADR-014-numerical-precision.md)

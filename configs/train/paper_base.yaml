@@ -1,0 +1,16 @@
+# Paper-exact optimization (spec §6.1, paper §5.3): reference only. On one T4 use
+# data.batching.max_tokens=8192 with update_freq=3 to approximate 25k tokens/side.
+name: paper_base
+seed: 1
+max_updates: 100000
+update_freq: 3
+label_smoothing: 0.1
+amp: auto
+optimizer: {betas: [0.9, 0.98], eps: 1.0e-9, weight_decay: 0.0}
+schedule: {kind: noam, warmup_steps: 4000, factor: 1.0}
+log_every: 100
+validate_every: 1000
+save_every: 1000
+average_last: 5
+time_budget_minutes: 690
+loggers: [stdout, jsonl]

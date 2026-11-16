@@ -148,3 +148,18 @@ def test_missing_tokenizer_without_training_is_critical(corpus_dir: Path, tmp_pa
     report = run_validation(options)
     assert report.exit_code() == 1
     assert report.get("data.loader") is None  # later checks are not attempted
+
+
+def test_training_resume_check_is_bit_identical_on_cpu(tmp_path: Path) -> None:
+    options = ValidationOptions(
+        data_config=REPO_ROOT / "configs" / "data" / "copy_task.yaml",
+        data_overrides=("copy.num_train=64", "copy.num_valid=16"),
+        model_configs=[],
+        device="cpu",
+        check_internet=False,
+        check_training_resume=True,
+    )
+    report = run_validation(options)
+    check = report.get("training.resume")
+    assert check is not None and check.status == "pass", report.format_table()
+    assert check.details["bit_identical"] is True

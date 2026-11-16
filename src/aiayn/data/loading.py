@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import torch
 from torch.utils.data import DataLoader
 
 from aiayn.data.collate import Collator
@@ -113,11 +114,17 @@ def build_dataloader(
     split: Split,
     *,
     pin_memory: bool = False,
+    generator: torch.Generator | None = None,
 ) -> DataLoader[Example]:
     """DataLoader yielding ``Batch`` objects.
 
     Call ``loader.batch_sampler.set_epoch(e)`` before each training epoch for
     reproducible, epoch-varying batches.
+
+    Pass a dedicated ``generator`` for exact resumption (ADR-013): ``DataLoader`` draws a
+    seed from the given generator, or from the *global* torch RNG when none is given,
+    every time an iterator is created. With the global RNG, a resumed run would shift
+    every later dropout mask.
     """
     b = config.batching
     return DataLoader(
@@ -127,4 +134,5 @@ def build_dataloader(
         num_workers=b.num_workers,
         pin_memory=pin_memory,
         persistent_workers=b.num_workers > 0,
+        generator=generator,
     )

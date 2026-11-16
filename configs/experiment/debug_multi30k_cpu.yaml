@@ -1,0 +1,7 @@
+# CPU smoke test of the full translation path (real data, tiny model, 20 updates).
+name: debug_multi30k_cpu
+data: multi30k
+model: transformer_tiny
+train: debug_cpu
+overrides:
+  - data.batching.max_tokens=1024

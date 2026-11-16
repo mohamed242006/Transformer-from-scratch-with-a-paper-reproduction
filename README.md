@@ -2,7 +2,7 @@
 
 A from-scratch PyTorch implementation and reproduction of the original Transformer (Vaswani et al., 2017). The goal is not just to train a model but to **demonstrate and verify** every component: hand-written modules, numerical parity with PyTorch's reference implementations, fair RNN baselines, paper-style ablations with multiple seeds, and honest metric reporting.
 
-> **Status: Week 4 of 11 complete (full model).** Encoder/decoder layers and stacks plus the full Transformer with three-way weight tying, all built only from the hand-written Week 3 modules. Layer, stack and full-model parity with PyTorch (fp64 within 1e-10). Parameter counts match math.md exactly (7,577,600 / 36,663,296 / 63,082,496). Training runs on Kaggle GPUs ([ADR-010](docs/decisions/ADR-010-compute-platform.md)).
+> **Status: Week 5 of 11 complete (training system).** Label-smoothed loss, Noam/inverse-sqrt schedules, fp16 AMP with GradScaler, gradient accumulation, atomic checkpoints and **bit-exact resumption** across Kaggle sessions, plus JSONL/TensorBoard/W&B logging. Validated on a Kaggle Tesla T4: the IWSLT-size model trains at ≈ 25k target tokens/s within 2.2 GB of VRAM ([docs/KAGGLE.md](docs/KAGGLE.md)).
 
 ## What makes this different from a tutorial
 | | |
@@ -31,7 +31,7 @@ A from-scratch PyTorch implementation and reproduction of the original Transform
 | 2 ✅ | Data pipeline (copy task, Multi30k, SentencePiece, token-budget batching) |
 | 3 ✅ | Core modules + parity tests |
 | 4 ✅ | Full model + invariance tests |
-| 5 | Training system |
+| 5 ✅ | Training system |
 | 6 | Inference + evaluation |
 | 7 | RNN baselines |
 | 8 | IWSLT14 main benchmark (3 seeds, Kaggle) |
@@ -46,6 +46,8 @@ python scripts/prepare_data.py   --config configs/data/multi30k.yaml         # d
 python scripts/train_tokenizer.py --config configs/data/multi30k.yaml        # joint BPE, 8k
 python scripts/inspect_data.py   --config configs/data/multi30k.yaml --split valid
 python scripts/count_params.py   --config configs/model/transformer_base.yaml --vocab-size 37000
+python scripts/train.py --experiment configs/experiment/copy_task_small.yaml --run-dir runs/copy   # ~100% in minutes on CPU
+python scripts/train.py --resume runs/copy --override train.max_updates=2000                     # exact continuation
 ```
 
 ## Development setup

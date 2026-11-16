@@ -33,8 +33,8 @@ Status markers: **[W1]** created in Week 1 · *(Wn)* populated in that week.
 ├── configs/                        [W1] (W2+) YAML configs, the only source of hyperparameters
 │   ├── model/                      [W4] transformer_tiny.yaml, transformer_iwslt.yaml, transformer_base.yaml
 │   ├── data/                       [W2] copy_task.yaml, multi30k.yaml · (W7) iwslt14_deen.yaml
-│   ├── train/                      e.g. noam_base.yaml, debug_cpu.yaml
-│   └── experiment/                 composed configs: one file per reported result
+│   ├── train/                      [W5] debug_cpu, copy_task, multi30k_t4, iwslt_t4, paper_base
+│   └── experiment/                 [W5] copy_task_small, multi30k_tiny, debug_multi30k_cpu (ADR-018)
 │
 ├── data/                           [W1] (W2+) local datasets and tokenizers, GITIGNORED except README
 │   ├── raw/                        downloaded archives (checksummed)
@@ -55,10 +55,10 @@ Status markers: **[W1]** created in Week 1 · *(Wn)* populated in that week.
 │
 ├── experiments/                    [W1] (W5+) one folder per run: metadata + metrics, no weights in git
 │
-├── notebooks/                      [W5p] kaggle_validate.ipynb · (later) analysis notebooks
+├── notebooks/                      [W5] kaggle_validate.ipynb, kaggle_train.ipynb · (later) analysis
 │
-├── scripts/                        [W2–W5p] prepare_data, train_tokenizer, inspect_data, count_params,
-│                                   kaggle_validate, package_for_kaggle
+├── scripts/                        [W2–W5] prepare_data, train_tokenizer, inspect_data, count_params,
+│                                   kaggle_validate, package_for_kaggle, train
 ├── dist/                           (gitignored) build output: dist/kaggle/ dataset bundles (ADR-016)
 │
 ├── src/
@@ -71,10 +71,10 @@ Status markers: **[W1]** created in Week 1 · *(Wn)* populated in that week.
 │       │   └── baselines/          [W1] (W7) lstm_seq2seq, gru_bahdanau, lstm_luong
 │       ├── data/                   [W2] special_tokens, example (framing), config (schema), tokenizer,
 │       │                                copy_task, datasets, sampler, collate, prepare, loading
-│       ├── training/               [W1] (W5) trainer, losses, schedulers, checkpointing
+│       ├── training/               [W5] config, experiment, losses, schedule, checkpoint, trainer
 │       ├── inference/              [W1] (W6) greedy, beam search, checkpoint averaging, translate API
 │       ├── evaluation/             [W1] (W6) BLEU/chrF wrappers, perplexity, length-bucket analysis
-│       ├── tracking/               [W1] (W5) Logger interface + W&B/TensorBoard/stdout backends
+│       ├── tracking/               [W5] loggers.py: stdout, jsonl (source of truth), TensorBoard, W&B
 │       └── diagnostics/            [W5-prep] Kaggle validation (validation.py, report.py), packaging.py
 │
 └── tests/                          [W1]

@@ -1,0 +1,16 @@
+# IWSLT14 DE->EN on a Kaggle T4 (docs/KAGGLE.md §7). Use with data.batching.max_tokens=8192
+# (~500 updates/epoch, ~60 epochs). Measured T4 throughput (transformer_iwslt, fp16):
+# ~25k target tokens/s -> roughly 3 h of compute per run.
+name: iwslt_t4
+seed: 1
+max_updates: 30000
+update_freq: 1
+label_smoothing: 0.1
+amp: auto
+schedule: {kind: inverse_sqrt, warmup_steps: 4000, peak_lr: 7.0e-4}
+log_every: 100
+validate_every: 1000
+save_every: 1000
+average_last: 5
+time_budget_minutes: 690
+loggers: [stdout, jsonl]

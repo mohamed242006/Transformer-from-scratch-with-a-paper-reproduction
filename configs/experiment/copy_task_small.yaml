@@ -1,0 +1,4 @@
+name: copy_task_small
+data: copy_task
+model: transformer_copy
+train: copy_task

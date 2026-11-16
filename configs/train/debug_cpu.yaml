@@ -1,0 +1,14 @@
+# Seconds-long CPU smoke run: exercises logging, validation, checkpoints and resume.
+name: debug_cpu
+seed: 1
+max_updates: 20
+update_freq: 2
+label_smoothing: 0.1
+amp: fp32
+schedule: {kind: inverse_sqrt, warmup_steps: 10, peak_lr: 1.0e-3}
+log_every: 5
+validate_every: 10
+save_every: 10
+average_last: 2
+loggers: [stdout, jsonl]
+device: cpu

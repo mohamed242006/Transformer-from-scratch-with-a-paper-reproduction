@@ -59,6 +59,11 @@ def main(argv: list[str] | None = None) -> int:
         "--expected-torch-version", help="torch.__version__ recorded before installing dependencies"
     )
     parser.add_argument("--no-internet-check", action="store_true")
+    parser.add_argument(
+        "--check-training-resume",
+        action="store_true",
+        help="train a small copy-task model, interrupt, resume, compare losses (~1 min)",
+    )
     parser.add_argument("--output", type=Path, default=Path("validation_report.json"))
     args = parser.parse_args(argv)
 
@@ -83,6 +88,7 @@ def main(argv: list[str] | None = None) -> int:
         warmup=args.warmup,
         expected_torch_version=args.expected_torch_version,
         check_internet=not args.no_internet_check,
+        check_training_resume=args.check_training_resume,
     )
     report = run_validation(options, output_dir=args.output.parent)
     path = report.write_json(args.output)

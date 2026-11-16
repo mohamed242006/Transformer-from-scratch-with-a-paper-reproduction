@@ -1,0 +1,4 @@
+name: multi30k_tiny
+data: multi30k
+model: transformer_tiny
+train: multi30k_t4

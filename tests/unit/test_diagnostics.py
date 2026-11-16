@@ -15,7 +15,7 @@ from aiayn.diagnostics.packaging import (
     tree_hash,
 )
 from aiayn.diagnostics.report import Outcome, Report
-from aiayn.diagnostics.validation import _version_tuple
+from aiayn.diagnostics.validation import _check_python, _version_tuple
 from tests.conftest import REPO_ROOT
 
 
@@ -108,3 +108,14 @@ def test_code_bundle_is_importable_and_complete(tmp_path: Path) -> None:
         }
         shipped = {p.relative_to(bundle) for p in bundle.glob(pattern)}
         assert expected == shipped, (pattern, expected ^ shipped)
+
+
+@pytest.mark.parametrize(
+    ("version", "status"),
+    [((3, 9), "fail"), ((3, 10), "pass"), ((3, 12), "pass"), ((3, 13), "pass"), ((3, 14), "warn")],
+)
+def test_python_check_accepts_tested_versions_and_warns_beyond(
+    version: tuple[int, int], status: str
+) -> None:
+    """Regression: Kaggle moved to Python 3.13, which the validator wrongly failed."""
+    assert _check_python(version).status == status

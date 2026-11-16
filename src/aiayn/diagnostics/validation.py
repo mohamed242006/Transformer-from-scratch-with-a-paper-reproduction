@@ -41,6 +41,7 @@ from aiayn.diagnostics.report import Outcome, Report, Status
 from aiayn.models import ModelConfig, Transformer, build_transformer, expected_parameter_count
 from aiayn.models.config import load_model_config
 from aiayn.modules import LayerNorm, MultiHeadAttention
+from aiayn.utils.config import config_to_dict
 from aiayn.utils.params import count_parameters
 from aiayn.utils.paths import find_repo_root
 
@@ -76,6 +77,7 @@ class ValidationOptions:
     warmup: int = 5
     expected_torch_version: str | None = None
     check_internet: bool = True
+    check_training_resume: bool = False
     seed: int = 0
 
 
@@ -181,13 +183,29 @@ def _saved_activation_bytes(model: Transformer, batch: Batch, state: _State) -> 
 # --------------------------------------------------------------------------- #
 # Checks
 # --------------------------------------------------------------------------- #
-def _check_python() -> Outcome:
-    v = sys.version_info
-    ok = (3, 10) <= (v.major, v.minor) <= (3, 12)
+#: Python versions covered by CI (keep in sync with .github/workflows/ci.yml).
+TESTED_PYTHON: tuple[tuple[int, int], ...] = ((3, 10), (3, 11), (3, 12), (3, 13))
+
+
+def _check_python(version: tuple[int, int] | None = None) -> Outcome:
+    """Fail below the package minimum (3.10); warn only for versions newer than CI covers.
+
+    The package declares ``requires-python >= 3.10`` with no upper bound, so a newer
+    interpreter is not an error by itself: the preflight test suites decide.
+    """
+    major, minor = version or (sys.version_info.major, sys.version_info.minor)
+    details = {
+        "version": platform.python_version(),
+        "tested": [f"{a}.{b}" for a, b in TESTED_PYTHON],
+    }
+    if (major, minor) < TESTED_PYTHON[0]:
+        return Outcome("fail", f"Python {major}.{minor} < 3.10 (package minimum)", details)
+    if (major, minor) in TESTED_PYTHON:
+        return Outcome("pass", f"Python {platform.python_version()} (CI-tested)", details)
     return Outcome(
-        "pass" if ok else "fail",
-        f"Python {platform.python_version()}",
-        {"version": platform.python_version()},
+        "warn",
+        f"Python {major}.{minor} is newer than CI covers; rely on the preflight tests",
+        details,
     )
 
 
@@ -645,6 +663,76 @@ def _check_throughput(run: _ModelRun, state: _State, steps: int, warmup: int) ->
     )
 
 
+def _check_training_resume(state: _State, updates: int = 16) -> Outcome:
+    """Uninterrupted vs interrupted-and-resumed training on this device (ADR-013).
+
+    Bit-identical on CPU; on GPU, non-deterministic kernels allow tiny differences, so
+    per-update losses must agree to 1e-3 (relative).
+    """
+    from aiayn.training import Trainer  # deferred: training is only needed for this check
+    from aiayn.training.experiment import experiment_from_dict
+
+    copy_cfg = load_data_config(find_repo_root() / "configs" / "data" / "copy_task.yaml")
+    data = config_to_dict(copy_cfg)
+    data["copy"].update(num_train=256, num_valid=32)
+    model = {
+        "name": "resume_check",
+        "d_model": 64,
+        "num_heads": 4,
+        "d_ff": 128,
+        "num_encoder_layers": 2,
+        "num_decoder_layers": 2,
+        "dropout": 0.1,
+        "max_positions": 128,
+    }
+    train = {
+        "name": "resume_check",
+        "seed": 5,
+        "max_updates": updates,
+        "update_freq": 2,
+        "device": "cuda" if state.device.type == "cuda" else "cpu",
+        "amp": "auto",
+        "loggers": ["jsonl"],
+        "log_every": 1,
+        "validate_every": 0,
+        "save_every": 0,
+        "schedule": {"kind": "inverse_sqrt", "warmup_steps": 4, "peak_lr": 1e-3},
+    }
+    raw = {"name": "resume_check", "data": data, "model": model, "train": train}
+
+    def losses(run_dir: Path) -> list[float]:
+        records = [
+            json.loads(line) for line in (run_dir / "metrics.jsonl").read_text("utf-8").splitlines()
+        ]
+        return [r["loss"] for r in records if r["split"] == "train"]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        straight = Path(tmp) / "straight"
+        Trainer.create(experiment_from_dict(raw), straight).train()
+        resumed = Path(tmp) / "resumed"
+        Trainer.create(
+            experiment_from_dict(raw, [f"train.max_updates={updates // 2}"]), resumed
+        ).train()
+        Trainer.resume(resumed, [f"train.max_updates={updates}"]).train()
+        a, b = losses(straight), losses(resumed)
+    if len(a) != updates or len(b) != updates:
+        return Outcome("fail", f"expected {updates} updates, got {len(a)} and {len(b)}")
+    worst = max(abs(x - y) / max(abs(x), 1e-12) for x, y in zip(a, b, strict=True))
+    exact = a == b
+    details = {
+        "updates": updates,
+        "max_relative_diff": worst,
+        "bit_identical": exact,
+        "device": str(state.device),
+        "amp": str(state.amp_dtype),
+    }
+    ok = exact or worst < 1e-3
+    note = "bit-identical" if exact else f"max relative difference {worst:.1e}"
+    return Outcome(
+        "pass" if ok else "fail", f"resume after {updates // 2}/{updates} updates: {note}", details
+    )
+
+
 # --------------------------------------------------------------------------- #
 # Orchestration
 # --------------------------------------------------------------------------- #
@@ -743,6 +831,9 @@ def run_validation(options: ValidationOptions, output_dir: Path | None = None) -
     max_tokens = options.vram_max_tokens or state.data_config.batching.max_tokens
     for path in options.model_configs:
         _run_model_checks(report, _ModelRun(load_model_config(path)), state, options, max_tokens)
+
+    if options.check_training_resume:
+        report.run("training.resume", lambda: _check_training_resume(state), critical=False)
 
     if report.total_seconds > 600:
         report.run(

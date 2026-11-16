@@ -20,7 +20,7 @@ torch_before = !python -c "import torch; print(torch.__version__)"
 !pip install -q -e . --no-deps
 !pip install -q "sacrebleu>=2.4"
 !python -m pytest tests/policy tests/parity tests/numerical -q -p no:cacheprovider
-!python scripts/kaggle_validate.py --data-config configs/data/multi30k.yaml --model-config configs/model/transformer_tiny.yaml --model-config configs/model/transformer_iwslt.yaml --data-override translation.root=/kaggle/working/data --train-tokenizer-if-missing --retrain-tokenizer-check --expected-fingerprint f04bec5925700e0aedbfd3e700e67823b3a59f0bdd17d5e01ab7a9f9f07c930a --expected-torch-version {torch_before[0]} --require-cuda --output /kaggle/working/validation/report.json
+!python scripts/kaggle_validate.py --data-config configs/data/multi30k.yaml --model-config configs/model/transformer_tiny.yaml --model-config configs/model/transformer_iwslt.yaml --data-override translation.root=/kaggle/working/data --train-tokenizer-if-missing --retrain-tokenizer-check --expected-fingerprint f04bec5925700e0aedbfd3e700e67823b3a59f0bdd17d5e01ab7a9f9f07c930a --expected-torch-version {torch_before[0]} --require-cuda --check-training-resume --output /kaggle/working/validation/report.json
 ```
 Multi30k is downloaded from its pinned URLs (checksum-verified). The tokenizer is trained on Kaggle and must reproduce the local fingerprint (`tokenizer.fingerprint`). The last line prints the report table and exits non-zero on any critical failure. The offline alternative (Kaggle Datasets, no internet) is described in §2–4.
 
@@ -92,19 +92,24 @@ New datasets created by the CLI are private by default.
 | `tokenizer.deterministic` fails | SentencePiece version differs across machines | Use the bundled tokenizer only (never retrain on Kaggle); record versions |
 | `model[*].memory` warn | Peak reserved > 90% of GPU memory | Lower `batching.max_tokens` (see `suggested_max_tokens_80pct`) |
 
-## 5. Expected VRAM usage
-**Setting:** the **worst-case** training step (forward, backward, Adam step) at the default `max_tokens = 4096` per side, every sentence at the Multi30k length limit (40 sentences × 100 tokens per side), fp16 autocast with GradScaler. Values were measured on the development CPU by summing the tensors autograd saves (bf16 standing in for fp16), plus the analytic static memory. They are **estimates (±25%)**. Cell 5 replaces them with measured values on the GPU (`peak_allocated_mib`, `peak_reserved_mib`).
+## 5. Measured VRAM and throughput (Tesla T4, 2026-11-16)
+First validation run on Kaggle: Tesla T4, Python 3.13, fp16 autocast + GradScaler, Multi30k data (V = 8,000). **VRAM** is the peak allocated by PyTorch for one **worst-case** training step (forward, backward, Adam update): 40 sentences × 100 tokens per side = 4,000 padded tokens per side at `max_tokens = 4096`. **Throughput** is the mean over 30 real training steps at `max_tokens = 4096`.
 
-| Model (V = 8,000) | Params | Static (weights + grads + Adam + fp16 cache) | Saved activations | Logits + grad (fp32) | **Est. peak allocated** | Expected in `nvidia-smi`* |
-|---|---|---|---|---|---|---|
-| `transformer_tiny` | 7.58 M | 130 MiB | 710 MiB | 244 MiB | **≈ 1.1 GiB** | ≈ 1.4–1.8 GiB |
-| `transformer_iwslt` | 35.6 M | 612 MiB | 2,762 MiB | 244 MiB | **≈ 3.5 GiB** | ≈ 4.0–4.6 GiB |
+| Model | Params | **Peak VRAM (measured)** | Earlier CPU-based estimate | **Throughput (measured)** |
+|---|---|---|---|---|
+| `transformer_tiny` | 7.58 M | **898 MiB** | 1,084 MiB (+21%) | **78,808 target tokens/s** |
+| `transformer_iwslt` | 35.6 M | **2,243 MiB** | 3,618 MiB (+61%) | **24,669 target tokens/s** |
 
-\* plus the CUDA context (~0.3–0.5 GiB) and allocator caching.
+The estimates were conservative (they used bf16 autocast on CPU as a stand-in for fp16 on CUDA). The measured values are authoritative.
 
-- **On IWSLT14** (V ≈ 10k, the real target of `transformer_iwslt`): about 36.7 M parameters and logits around 305 MiB, so the peak is ≈ **3.7 GiB** at 4096 tokens per side.
-- **Typical batches use less memory than the worst case.** Real Multi30k sentences average about 15 tokens, and the attention terms grow with sentence length.
-- **Headroom on a T4** (15 GiB usable; activations grow linearly with tokens): staying under 80% of memory allows roughly **52k tokens/side** for `transformer_tiny` and **16k tokens/side** for `transformer_iwslt`. The validator reports this as `suggested_max_tokens_80pct` from the measured peak. The paper used 25k tokens/side spread over 8 GPUs, so on one T4, IWSLT runs will use gradient accumulation (Week 5).
+**Memory headroom** (T4 ≈ 15.1 GB usable, budget 80% ≈ 12.1 GB). The static part (fp32 weights + gradients + 2 Adam moments ≈ 16 bytes/parameter) is ≈ 116 MiB for tiny and ≈ 544 MiB for iwslt. Activations grow linearly with tokens per step, so the largest worst-case token budgets within 80% are roughly:
+
+| Model | Activations per 4,096 tokens | Max `max_tokens`/side at 80% |
+|---|---|---|
+| `transformer_tiny` | ≈ 782 MiB | ≈ 60k |
+| `transformer_iwslt` | ≈ 1,700 MiB | ≈ 28k |
+
+So even the paper's 25k tokens per side fits on one T4 for the IWSLT model. Memory is not the constraint; **time is.**
 
 ## 6. GitHub vs Kaggle Dataset for delivering the code
 | | Kaggle Dataset (chosen, ADR-016) | GitHub clone |
@@ -120,3 +125,40 @@ New datasets created by the CLI are private by default.
 **Update 2026-11-16:** the owner restored the GitHub repository (`master`), so the **GitHub clone is now the primary path** (§0); Kaggle Datasets remain the offline fallback. The comparison below is kept for reference.
 
 **Original recommendation (no repository at the time):** use **Kaggle Datasets now**. They are the only option that works without a repository and without internet, keep licensed data private, and the tree hash gives the provenance that a commit SHA would. Add GitHub later, when you want public visibility for the portfolio: a public repo is valuable on a CV, and the notebook can switch to `git clone` with a two-line change. Keep the data bundle on Kaggle either way.
+
+## 7. Recommended training settings on a Kaggle T4
+| Setting | Multi30k + `transformer_tiny` | IWSLT14 + `transformer_iwslt` |
+|---|---|---|
+| Experiment / train config | `multi30k_tiny` / `multi30k_t4` | (Week 8) / `iwslt_t4` |
+| AMP | **fp16 autocast + GradScaler** (T4 has no bf16; ADR-014) | same |
+| Token budget (`data.batching.max_tokens`) | **4,096** per side (≈ 260 sentences) | **8,192** per side (≈ 300 sentences) |
+| Gradient accumulation (`update_freq`) | **1** | **1** (≈ 8k-token updates, the usual size for IWSLT) |
+| Updates per epoch | ≈ 128 | ≈ 500 |
+| Learning rate | inverse-sqrt, peak 7e-4, warmup 400 | inverse-sqrt, peak 7e-4, warmup 4,000 |
+| Length | 30 epochs ≈ 3,800 updates | 30,000 updates ≈ 60 epochs |
+| Validation / checkpoints | every epoch / every 500 updates | every 1,000 updates / every 1,000 updates |
+| Worst-case peak VRAM | ≈ 0.9 GB | ≈ 4 GB |
+
+Why not larger batches? Multi30k is small (≈ 0.46 M target tokens per epoch): bigger batches would mean very few updates per epoch. For IWSLT, 8k tokens is the common setting, and the paper's 25k only pays off with far more data. `paper_base` (25k via 8,192 × 3 accumulation, exact Noam) is kept for reference.
+
+### Estimated training time (T4, from the measured throughput)
+| Run | Compute | + validation, checkpoints, setup | **Per run** | Planned runs |
+|---|---|---|---|---|
+| Multi30k, tiny, 30 epochs | 30 × 0.46 M tokens ÷ 78.8k tok/s ≈ **3 min** | data prep + tokenizer ≈ 1 min, I/O ≈ 1 min | **≈ 5–8 min** | ablations: 8 variants × 3 seeds ≈ 24 runs ≈ **2.5–3 GPU-h** |
+| IWSLT14, iwslt, 30k updates | ≈ 60 × 4 M tokens ÷ ≈ 22k tok/s ≈ **3 h** | validation ≈ 5 min, 30 checkpoints of ≈ 0.44 GB ≈ 2 min | **≈ 3–3.5 h** | headline: 3 seeds ≈ **10–11 GPU-h** (one session each) |
+
+Assumptions: IWSLT14 DE→EN ≈ 160k pairs ≈ 4 M target tokens per epoch at a 10k vocabulary (to be measured in Week 7). IWSLT throughput is taken slightly below the Multi30k measurement (longer sentences, larger output layer). Each IWSLT run fits in one 12 h session, and runs that don't finish resume exactly (ADR-013). Total plan ≈ 15 GPU-h, about half of one week's Kaggle quota.
+
+## 8. Training on Kaggle (multi-session, resumable)
+Notebook `notebooks/kaggle_train.ipynb` (thin wrapper around `scripts/train.py`):
+1. **Session 1:** set `EXPERIMENT` and `RUN_NAME`, keep `RESUME_FROM = None`, then *Save Version → Save & Run All (Commit)*. The data is downloaded and checksum-verified, the tokenizer is trained (its fingerprint is stored in the run), and training stops cleanly at the 11.5 h session budget if needed (exit code 3).
+2. **Session 2+:** add the previous version's **output** as an input and set `RESUME_FROM = "/kaggle/input/<output>/runs/<RUN_NAME>"`. The run directory is copied to `/kaggle/working`, its config hash and tokenizer fingerprint are verified, and training continues from the exact update, batch and random state.
+3. Each session's output (`/kaggle/working/runs/<RUN_NAME>/`) holds `config.yaml`, `metadata.json` (one entry per session), `metrics.jsonl`, `tokenizer/`, and `checkpoints/{last,last.prev,best}.pt` + `avg/`.
+
+Equivalent commands:
+```bash
+python scripts/train.py --experiment configs/experiment/multi30k_tiny.yaml --run-dir /kaggle/working/runs/multi30k_tiny_s1 --prepare-data
+python scripts/train.py --resume /kaggle/input/<output>/runs/multi30k_tiny_s1 --run-dir /kaggle/working/runs/multi30k_tiny_s1 --prepare-data
+```
+Only `train.{max_updates, max_epochs, time_budget_minutes, log_every, loggers, device}` may change on resume (ADR-018); any other change is refused.
+

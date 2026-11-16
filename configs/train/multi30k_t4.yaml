@@ -1,0 +1,15 @@
+# Multi30k on a Kaggle T4 (docs/KAGGLE.md §7). ~128 updates/epoch at 4096 tokens/side.
+# Measured T4 throughput (transformer_tiny, fp16): ~79k target tokens/s -> ~6 s/epoch of compute.
+name: multi30k_t4
+seed: 1
+max_epochs: 30
+update_freq: 1
+label_smoothing: 0.1
+amp: auto                 # fp16 + GradScaler on T4 (ADR-014)
+schedule: {kind: inverse_sqrt, warmup_steps: 400, peak_lr: 7.0e-4}
+log_every: 25
+validate_every: 0         # every epoch
+save_every: 500
+average_last: 5
+time_budget_minutes: 690  # 11.5 h of a 12 h Kaggle session (ADR-013 §5)
+loggers: [stdout, jsonl]
