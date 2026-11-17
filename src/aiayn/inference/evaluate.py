@@ -22,7 +22,7 @@ from aiayn.evaluation.metrics import bleu_by_length, corpus_scores
 from aiayn.inference.decoding import DecodeConfig
 from aiayn.inference.translator import Translator, load_run
 
-__all__ = ["evaluate_run"]
+__all__ = ["evaluate_run", "load_references"]
 
 
 def _copy_split(info: Any, split: Split) -> tuple[list[list[int]], list[str]]:
@@ -43,6 +43,26 @@ def _copy_split(info: Any, split: Split) -> tuple[list[list[int]], list[str]]:
         sources.append(ex.src[:-1].tolist())
         references.append(" ".join(map(str, ex.tgt[1:-1].tolist())))
     return sources, references
+
+
+def _translation_split(info: Any, split: Split, prepare_data: bool) -> tuple[list[str], list[str]]:
+    t = info.data_config.translation
+    paths = data_paths(info.data_config)
+    if prepare_data and not paths.text_file(split, t.src_lang).is_file():
+        prepare_translation_data(info.data_config)
+    return read_parallel_text(
+        paths.text_file(split, t.src_lang), paths.text_file(split, t.tgt_lang)
+    )
+
+
+def load_references(
+    run_dir: str | Path, split: Split = "test", *, prepare_data: bool = False
+) -> list[str]:
+    """The raw reference lines ``evaluate_run`` scores against, in corpus order."""
+    info = load_run(run_dir)
+    if info.data_config.translation is not None:
+        return _translation_split(info, split, prepare_data)[1]
+    return _copy_split(info, split)[1]
 
 
 def evaluate_run(
@@ -70,13 +90,7 @@ def evaluate_run(
     )
     start = time.perf_counter()
     if info.data_config.translation is not None:
-        t = info.data_config.translation
-        paths = data_paths(info.data_config)
-        if prepare_data and not paths.text_file(split, t.src_lang).is_file():
-            prepare_translation_data(info.data_config)
-        sources_text, references = read_parallel_text(
-            paths.text_file(split, t.src_lang), paths.text_file(split, t.tgt_lang)
-        )
+        sources_text, references = _translation_split(info, split, prepare_data)
         assert info.tokenizer is not None
         source_ids = info.tokenizer.encode_batch(sources_text)
         hyps = translator.translate_ids(source_ids, decode)

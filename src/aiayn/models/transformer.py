@@ -20,6 +20,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
+from aiayn.models.base import EncoderDecoder
 from aiayn.models.config import ModelConfig
 from aiayn.modules.decoder import Decoder
 from aiayn.modules.embedding import TokenEmbedding
@@ -75,7 +76,7 @@ def _make_positional(config: ModelConfig) -> Positional:
     return LearnedPositionalEmbedding(config.d_model, config.max_positions, dropout=config.dropout)
 
 
-class Transformer(nn.Module):
+class Transformer(EncoderDecoder):
     """Encoder-decoder Transformer built only from ``aiayn.modules`` components.
 
     Args:
@@ -143,6 +144,10 @@ class Transformer(nn.Module):
     # ------------------------------------------------------------------ #
     # Weight access
     # ------------------------------------------------------------------ #
+    @property
+    def max_positions(self) -> int:
+        return self.config.max_positions
+
     @property
     def src_embedding(self) -> TokenEmbedding:
         key = "shared" if self.config.tie_weights else "source"

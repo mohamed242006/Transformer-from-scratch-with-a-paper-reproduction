@@ -59,7 +59,8 @@ Status markers: **[W1]** created in Week 1 · *(Wn)* populated in that week.
 │
 ├── scripts/                        [W2–W5] prepare_data, train_tokenizer, inspect_data, count_params,
 │                                   kaggle_validate, package_for_kaggle, train, evaluate,
-│                                   translate, average_checkpoints, report, kaggle_publish_runs
+│                                   translate, average_checkpoints, report, kaggle_publish_runs,
+│                                   compare_runs
 ├── dist/                           (gitignored) build output: dist/kaggle/ dataset bundles (ADR-016)
 │
 ├── src/
@@ -69,12 +70,15 @@ Status markers: **[W1]** created in Week 1 · *(Wn)* populated in that week.
 │       ├── modules/                [W3/W4] embedding, positional, attention, multihead, layernorm,
 │       │                                feedforward, sublayer, masking, init, encoder, decoder
 │       ├── models/                 [W4] config.py (ModelConfig, parameter formula), transformer.py
-│       │   └── baselines/          [W1] (W7) lstm_seq2seq, gru_bahdanau, lstm_luong
+│       │   ├── base.py, factory.py [W7] EncoderDecoder interface; build_model dispatch
+│       │   └── baselines/          [W7] RNNConfig, RNNSeq2Seq (LSTM/GRU), Bahdanau/Luong attention
 │       ├── data/                   [W2] special_tokens, example (framing), config (schema), tokenizer,
 │       │                                copy_task, datasets, sampler, collate, prepare, loading
 │       ├── training/               [W5] config, experiment, losses, schedule, checkpoint, trainer
-│       ├── inference/              [W6] decoding (greedy, beam), averaging, translator, evaluate, report
-│       ├── evaluation/             [W6] metrics: sacreBLEU, lowercased BLEU, chrF, exact match, by-length
+│       ├── inference/              [W6] decoding (greedy, beam), averaging, translator, evaluate, report;
+│       │                           [W7] comparison (fairness checks, COMPARISON.md)
+│       ├── evaluation/             [W6] metrics: sacreBLEU, lowercased BLEU, chrF, exact match, by-length;
+│       │                           [W7] paired bootstrap significance
 │       ├── tracking/               [W5] loggers.py: stdout, jsonl (source of truth), TensorBoard, W&B
 │       └── diagnostics/            [W5p/W6] Kaggle validation, packaging, kaggle_runs (persistence)
 │
@@ -201,7 +205,7 @@ Each entry lists **Owner**, **Responsibilities**, **Acceptable contents** and **
 
 ### `src/aiayn/models/`
 - **Owner:** Model owner
-- **Responsibilities:** assembling modules into complete models: `Transformer` (encode / decode / generator, weight tying, initialization) and `baselines/` (LSTM, GRU+Bahdanau, BiLSTM+Luong).
+- **Responsibilities:** assembling modules into complete models: `Transformer` (encode / decode / generator, weight tying, initialization) and `baselines/` (LSTM, GRU+Bahdanau, BiLSTM+Luong; ADR-021). Every model implements `EncoderDecoder` (`base.py`); `build_model` (`factory.py`) dispatches on the config, and `nn.LSTM`/`nn.GRU` may appear only in `baselines/`.
 - **Acceptable:** model classes and their factory functions built from a config dataclass.
 - **Forbidden:** training loops, decoding algorithms (those live in `inference/`), dataset code.
 

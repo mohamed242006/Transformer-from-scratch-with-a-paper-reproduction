@@ -1,0 +1,15 @@
+# Baseline 2 (DESIGN.md §7, ADR-021): bidirectional GRU encoder, GRU decoder with
+# additive attention (Bahdanau et al., 2015; single layer as in the paper, tanh readout
+# instead of maxout).
+# 7,513,536 parameters with the 8k joint vocabulary (-0.8% vs transformer_tiny's 7,577,600).
+name: gru_bahdanau
+architecture: rnn
+cell: gru
+attention: bahdanau
+embedding_dim: 256
+hidden_size: 448
+num_layers: 1
+bidirectional_encoder: true
+dropout: 0.3
+tie_weights: true
+max_positions: 1024

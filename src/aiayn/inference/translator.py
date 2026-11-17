@@ -22,7 +22,7 @@ from aiayn.data.special_tokens import PAD_ID
 from aiayn.data.tokenizer import SentencePieceTokenizer
 from aiayn.inference.averaging import average_checkpoint_files, load_weights, snapshot_paths
 from aiayn.inference.decoding import DecodeConfig, Hypothesis, beam_search, greedy_decode
-from aiayn.models import ModelConfig, Transformer, build_transformer
+from aiayn.models import EncoderDecoder, build_model, model_config_from_dict
 from aiayn.utils.config import from_dict, load_yaml
 
 __all__ = ["RunInfo", "Translator", "load_run"]
@@ -35,7 +35,7 @@ class RunInfo:
         raw = load_yaml(run_dir / "config.yaml")
         self.run_dir = run_dir
         self.name = str(raw.get("name", run_dir.name))
-        self.model_config = from_dict(ModelConfig, raw["model"], "model")
+        self.model_config = model_config_from_dict(raw["model"], "model")
         self.data_config = from_dict(DataConfig, raw["data"], "data")
         self.tokenizer: SentencePieceTokenizer | None = None
         if self.data_config.translation is not None:
@@ -80,7 +80,7 @@ class Translator:
 
     def __init__(
         self,
-        model: Transformer,
+        model: EncoderDecoder,
         tokenizer: SentencePieceTokenizer | None,
         *,
         device: torch.device,
@@ -105,9 +105,7 @@ class Translator:
         max_tokens: int = 4096,
     ) -> Translator:
         info = load_run(run_dir)
-        model = build_transformer(
-            info.model_config, vocab_size=info.vocab_size, pad_id=PAD_ID, seed=0
-        )
+        model = build_model(info.model_config, vocab_size=info.vocab_size, pad_id=PAD_ID, seed=0)
         model.load_state_dict(_weights(info.run_dir, checkpoint, average_last))
         return cls(model, info.tokenizer, device=_resolve_device(device), max_tokens=max_tokens)
 
@@ -125,7 +123,7 @@ class Translator:
     ) -> list[Hypothesis]:
         """Content token IDs in (no BOS/EOS), hypotheses out, in input order."""
         config = config or DecodeConfig()
-        limit = self.model.config.max_positions - 1  # room for EOS
+        limit = self.model.max_positions - 1  # room for EOS
         framed = []
         for ids in sources:
             if len(ids) > limit:

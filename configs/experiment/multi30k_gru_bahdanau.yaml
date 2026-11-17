@@ -1,0 +1,10 @@
+# Week 7 baseline (ADR-021): identical data, tokenizer, batching, schedule, epochs,
+# label smoothing, checkpoint averaging and decoding to multi30k_tiny. The one
+# declared difference is gradient clipping, a standard RNN stabilizer; it can only
+# help the baseline, so it keeps the comparison conservative.
+name: multi30k_gru_bahdanau
+data: multi30k
+model: gru_bahdanau
+train: multi30k_t4
+overrides:
+  - train.clip_norm=1.0

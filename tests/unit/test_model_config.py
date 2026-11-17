@@ -10,6 +10,7 @@ from aiayn.models import (
     ModelConfig,
     build_transformer,
     expected_parameter_count,
+    load_any_model_config,
     load_model_config,
 )
 from aiayn.utils.config import ConfigError, config_to_dict, from_dict
@@ -28,7 +29,7 @@ DOCUMENTED = [
 
 @pytest.mark.parametrize("path", sorted(CONFIGS.glob("*.yaml")))
 def test_repository_model_configs_are_valid(path: Path) -> None:
-    cfg = load_model_config(path)
+    cfg = load_any_model_config(path)  # Transformer or RNN baseline (ADR-021)
     assert cfg.name == path.stem
 
 

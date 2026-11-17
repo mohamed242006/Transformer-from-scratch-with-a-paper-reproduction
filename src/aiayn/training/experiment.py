@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from aiayn.data.config import DataConfig
-from aiayn.models.config import ModelConfig
+from aiayn.models.factory import AnyModelConfig, model_config_from_dict
 from aiayn.training.config import TrainConfig
 from aiayn.utils.config import (
     ConfigError,
@@ -51,7 +51,7 @@ DECODE_MARGIN = 50
 class Experiment:
     name: str
     data: DataConfig
-    model: ModelConfig
+    model: AnyModelConfig
     train: TrainConfig
 
     def to_dict(self) -> dict[str, Any]:
@@ -100,7 +100,7 @@ def experiment_from_dict(raw: dict[str, Any], overrides: Sequence[str] = ()) -> 
         return Experiment(
             name=str(raw["name"]),
             data=from_dict(DataConfig, groups["data"], "data"),
-            model=from_dict(ModelConfig, groups["model"], "model"),
+            model=model_config_from_dict(groups["model"], "model"),
             train=from_dict(TrainConfig, groups["train"], "train"),
         )
     except ConfigError as exc:

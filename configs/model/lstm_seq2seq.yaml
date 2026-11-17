@@ -1,0 +1,15 @@
+# Baseline 1 (DESIGN.md §7, ADR-021): LSTM encoder-decoder without attention
+# (Sutskever et al., 2014; no source reversal). The encoder's final state is the
+# only channel to the decoder.
+# 7,536,384 parameters with the 8k joint vocabulary (-0.5% vs transformer_tiny's 7,577,600).
+name: lstm_seq2seq
+architecture: rnn
+cell: lstm
+attention: none
+embedding_dim: 256
+hidden_size: 432
+num_layers: 2
+bidirectional_encoder: false
+dropout: 0.3            # embeddings, between layers, encoder outputs, readout
+tie_weights: true       # three-way, as transformer_tiny
+max_positions: 1024     # decode-length cap only (no position table)

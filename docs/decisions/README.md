@@ -26,11 +26,12 @@ An ADR records **one** significant decision: the forces that shaped it, what was
 | [ADR-018](ADR-018-experiment-composition.md) | Experiment composition, compatibility checks and resume-safe config hashing | Accepted | 2026-11-16 |
 | [ADR-019](ADR-019-decoding-and-evaluation.md) | Decoding, checkpoint averaging and the evaluation pipeline | Accepted | 2026-11-16 |
 | [ADR-020](ADR-020-kaggle-run-persistence.md) | Preserve Kaggle runs: commit-mode sessions + private runs dataset, auto-resume | Accepted | 2026-11-16 |
+| [ADR-021](ADR-021-rnn-baselines-and-fair-comparison.md) | RNN baselines (LSTM, GRU+Bahdanau, BiLSTM+Luong) and the fair-comparison protocol | Accepted | 2026-11-17 |
 
 ### Planned ADRs (not yet written)
 | Planned | Topic | Target week |
 |---|---|---|
-| ADR-021 | IWSLT14 source pinning and preprocessing; RNN baseline fairness protocol | Week 7 |
+| ADR-022 | IWSLT14 source pinning and preprocessing | Week 8 |
 
 ## Lifecycle
 `Proposed` → `Accepted` → (`Deprecated` | `Superseded by ADR-XXX`)

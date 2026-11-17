@@ -37,7 +37,7 @@ from aiayn.data.prepare import data_paths, prepare_translation_data
 from aiayn.data.sampler import TokenBudgetBatchSampler
 from aiayn.data.special_tokens import PAD_ID
 from aiayn.data.tokenizer import SentencePieceTokenizer
-from aiayn.models import Transformer, build_transformer
+from aiayn.models import EncoderDecoder, build_model
 from aiayn.tracking.loggers import MultiLogger, build_loggers
 from aiayn.training.checkpoint import (
     atomic_save,
@@ -195,7 +195,7 @@ class Trainer:
         self.sampler = cast(TokenBudgetBatchSampler, self.train_loader.batch_sampler)
 
         # Model and optimization.
-        self.model: Transformer = build_transformer(
+        self.model: EncoderDecoder = build_model(
             experiment.model, vocab_size=vocab_size, pad_id=PAD_ID, seed=cfg.seed
         ).to(self.device)
         o = cfg.optimizer

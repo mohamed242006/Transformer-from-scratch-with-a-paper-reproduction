@@ -179,13 +179,13 @@ Results are written to `runs/<id>/eval/*.json` (cased sacreBLEU with signature, 
 1. kaggle.com → *Settings → API → Create New Token* (downloads `kaggle.json` with `username` and `key`).
 2. In the training notebook: *Add-ons → Secrets* → add `KAGGLE_USERNAME` and `KAGGLE_KEY` with those values, and enable both for the notebook.
 
-**Every session** (`notebooks/kaggle_train.ipynb`, unchanged parameters except `EXPERIMENT`/`RUN_NAME`):
+**Every session** (`notebooks/kaggle_train.ipynb`; edit only the `RUNS` list of `(experiment, run name)` pairs):
 1. *Add Input*: the previous version's output and/or your `aiayn-runs` dataset (if they exist).
 2. **Save Version → Save & Run All (Commit).** The notebook then:
-   - auto-resumes `RUN_NAME` from the most advanced copy found in `/kaggle/input/**` (or starts a new run);
+   - for each run in `RUNS`, auto-resumes it from the most advanced copy found in `/kaggle/input/**` (or starts it), with the time left in the session as its budget;
    - trains until completion or the 11.5 h budget (exit code 3 = resumable);
-   - for a completed run, evaluates the test set (best beam 4, averaged beam 4, best greedy) and writes `runs/<RUN_NAME>/REPORT.md`;
-   - publishes `runs/<RUN_NAME>` (minus `last.prev.pt`) as a new version of the **private** dataset `<user>/aiayn-runs`, carrying over the other runs already in the attached dataset.
+   - for a completed run, evaluates the test set (best beam 4, averaged beam 4, best greedy) and writes `runs/<name>/REPORT.md`;
+   - publishes every run directory (minus `last.prev.pt`) as a new version of the **private** dataset `<user>/aiayn-runs`, carrying over the other runs already in the attached dataset.
 3. Copies that exist after the session: the commit output **and** `aiayn-runs`. Either one is enough to resume or re-evaluate.
 
 | What | Where it is preserved |
@@ -196,3 +196,22 @@ Results are written to `runs/<id>/eval/*.json` (cased sacreBLEU with signature, 
 | BLEU report (`REPORT.md`) | commit output + `aiayn-runs` |
 
 Manual equivalents: `python scripts/report.py --run-dir <run>` and `python scripts/kaggle_publish_runs.py --run <run> --user <you> [--previous /kaggle/input/aiayn-runs] [--dry-run]`.
+
+## 10. Baselines and the comparison session (Week 7, ADR-021)
+The default `RUNS` list trains the three RNN baselines after the Transformer reference, in one committed session:
+
+| Run name | Experiment | Model |
+|---|---|---|
+| `multi30k_tiny_s1` | `multi30k_tiny` | Transformer (reference; found finished in `aiayn-runs`, so only missing evaluations run) |
+| `multi30k_bilstm_luong_s1` | `multi30k_bilstm_luong` | BiLSTM + Luong attention |
+| `multi30k_gru_bahdanau_s1` | `multi30k_gru_bahdanau` | BiGRU + Bahdanau attention |
+| `multi30k_lstm_seq2seq_s1` | `multi30k_lstm_seq2seq` | LSTM, no attention |
+
+**Attach the `aiayn-runs` dataset** so the reference is reused instead of retrained. Once the reference and at least one baseline are evaluated, the notebook writes `runs/COMPARISON.md` (also copied into the reference run, so it is published). The file contains:
+- the fairness checks;
+- BLEU with 95% CI, ΔBLEU and a paired-bootstrap p-value against the Transformer;
+- chrF, length ratio, validation NLL, wall time, throughput and memory.
+
+Locally: `python scripts/compare_runs.py --run runs/multi30k_tiny_s1 --run runs/multi30k_bilstm_luong_s1 ... --out runs/COMPARISON.md`. The first run is the reference. Exit code 1 means a fairness check failed.
+
+More seeds: add `("configs/experiment/<exp>.yaml", "<exp>_s2")` entries with `OVERRIDES = ["train.seed=2"]`. Overrides apply to new runs only. The comparison adds a mean ± std table.

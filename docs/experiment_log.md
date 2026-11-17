@@ -210,3 +210,21 @@ The validation smoothed loss plateaus at ≈ 0.60, the theoretical floor H(q′)
 **Decision: re-run, don't skip.** The re-run costs ≈ 4–5 min of training + 1–2 min of evaluation on a T4 (from the measured 67k tok/s), under 1% of a weekly quota. It produces the first real-data BLEU (Week 6's open exit criterion) and the Transformer reference that Week 7's RNN baselines are compared against. Same seed and config, so its best validation NLL should land close to the lost run's 1.910, which doubles as a reproducibility check. Skipping to Week 7 would leave decoding and evaluation unverified on real text.
 
 **Workflow change (ADR-020):** commit-mode training notebook (train → evaluate → `REPORT.md` → publish) · private `aiayn-runs` dataset updated each session via the Kaggle CLI (notebook secrets) · stable `RUN_NAME` + auto-resume from any attached input (zips included) · `scripts/report.py`, `scripts/kaggle_publish_runs.py`, `aiayn.diagnostics.kaggle_runs`, `aiayn.inference.report`.
+
+---
+
+## 2026-11-17 · Week 6 closed: first Transformer benchmark · Week 7 baselines
+
+**Reference result** (`multi30k_tiny_s1`, re-run under the ADR-020 workflow), Multi30k test 2016, EN→DE:
+
+| Checkpoint | Search | BLEU | chrF | Length ratio |
+|---|---|---|---|---|
+| averaged (last 5) | beam 4, α 0.6 | **36.87** | 60.74 | 0.963 |
+
+Week 6 exit criterion met: first real BLEU. The length ratio of 0.963 means slightly short outputs (brevity penalty ≈ 0.96). The α sweep is a Week 8/9 candidate.
+
+**Week 7: baselines (ADR-021).** LSTM seq2seq (no attention), BiGRU + Bahdanau and BiLSTM + Luong. All three are sized within 1% of the Transformer's 7.58M parameters and run through the same trainer, beam search and evaluation via the new `EncoderDecoder` interface. The only declared training difference is `clip_norm=1.0` for the RNNs. `scripts/compare_runs.py` checks fairness from the run files and adds paired-bootstrap significance.
+
+**Next action:** run `notebooks/kaggle_train.ipynb` (default `RUNS`, `aiayn-runs` attached) as Save & Run All (Commit), then record `COMPARISON.md` here.
+
+**Expected:** Transformer > BiLSTM+Luong ≳ GRU+Bahdanau ≫ LSTM without attention. A baseline beating the Transformer on Multi30k would not be implausible at this scale and would be reported as such.

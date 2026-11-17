@@ -1,4 +1,5 @@
-"""Train a Transformer from an experiment config, or resume a run (ADR-013, ADR-018).
+"""Train a model (Transformer or RNN baseline) from an experiment config, or resume a
+run (ADR-013, ADR-018, ADR-021).
 
 New run:
     python scripts/train.py --experiment configs/experiment/multi30k_tiny.yaml \\

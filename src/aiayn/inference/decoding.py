@@ -2,8 +2,10 @@
 
 Both decoders:
 
+* work with any ``EncoderDecoder`` (Transformer or RNN baseline; ADR-021);
 * run the encoder once per batch and recompute the decoder over the prefix at each step
-  (no KV cache yet: a planned extension; cost is fine at sentence length);
+  (no KV cache or carried RNN state yet: a planned extension; exact for every model
+  because decoders are causal; cost is fine at sentence length);
 * never generate PAD or BOS;
 * stop each sentence at EOS or at ``max_len = max_len_a · |x| + max_len_b`` generated tokens
   (paper: input length + 50, so a = 1, b = 50), where EOS is forced on the last step;
@@ -30,7 +32,7 @@ import torch
 import torch.nn.functional as F
 
 from aiayn.data.special_tokens import BOS_ID, EOS_ID, PAD_ID
-from aiayn.models import Transformer
+from aiayn.models import EncoderDecoder
 
 __all__ = ["DecodeConfig", "Hypothesis", "beam_search", "greedy_decode", "length_penalty"]
 
@@ -73,9 +75,9 @@ def _max_lengths(src: torch.Tensor, pad_id: int, config: DecodeConfig, cap: int)
 
 
 def _step_log_probs(
-    model: Transformer,
+    model: EncoderDecoder,
     tokens: torch.Tensor,
-    memory: torch.Tensor,
+    memory: Any,
     src_mask: torch.Tensor,
     autocast_dtype: torch.dtype | None,
 ) -> torch.Tensor:
@@ -104,8 +106,8 @@ def _force_eos(lprobs: torch.Tensor, rows: torch.Tensor) -> None:
 
 
 def _encode(
-    model: Transformer, src: torch.Tensor, autocast_dtype: torch.dtype | None
-) -> tuple[torch.Tensor, torch.Tensor]:
+    model: EncoderDecoder, src: torch.Tensor, autocast_dtype: torch.dtype | None
+) -> tuple[Any, torch.Tensor]:
     ctx: Any = (
         torch.autocast(device_type=src.device.type, dtype=autocast_dtype)
         if autocast_dtype is not None
@@ -118,7 +120,7 @@ def _encode(
 
 @torch.no_grad()
 def greedy_decode(
-    model: Transformer,
+    model: EncoderDecoder,
     src: torch.Tensor,
     config: DecodeConfig | None = None,
     *,
@@ -132,7 +134,7 @@ def greedy_decode(
     config = config or DecodeConfig(beam_size=1)
     model.eval()
     batch = src.shape[0]
-    limits = _max_lengths(src, model.pad_id, config, model.config.max_positions - 1)
+    limits = _max_lengths(src, model.pad_id, config, model.max_positions - 1)
     limit_t = torch.tensor(limits, device=src.device)
     memory, src_mask = _encode(model, src, autocast_dtype)
     tokens = torch.full((batch, 1), BOS_ID, dtype=torch.long, device=src.device)
@@ -159,7 +161,7 @@ def greedy_decode(
 
 @torch.no_grad()
 def beam_search(
-    model: Transformer,
+    model: EncoderDecoder,
     src: torch.Tensor,
     config: DecodeConfig | None = None,
     *,
@@ -169,9 +171,9 @@ def beam_search(
     config = config or DecodeConfig()
     model.eval()
     batch, k, vocab = src.shape[0], config.beam_size, model.vocab_size
-    limits = _max_lengths(src, model.pad_id, config, model.config.max_positions - 1)
+    limits = _max_lengths(src, model.pad_id, config, model.max_positions - 1)
     memory, src_mask = _encode(model, src, autocast_dtype)
-    memory = memory.repeat_interleave(k, dim=0)  # [B*k, S, d]
+    memory = memory.repeat_interleave(k, dim=0)  # [B*k, S, d] (or RNNMemory)
     src_mask = src_mask.repeat_interleave(k, dim=0)  # [B*k, 1, 1, S]
     device = src.device
     tokens = torch.full((batch * k, 1), BOS_ID, dtype=torch.long, device=device)

@@ -132,3 +132,44 @@ def test_src_contains_no_forbidden_apis() -> None:
             path.read_text(encoding="utf-8"), str(path.relative_to(SRC_ROOT))
         )
     assert not violations, "ADR-001 violations:\n" + "\n".join(violations)
+
+
+# --------------------------------------------------------------------------- #
+# ADR-001 / ADR-021: recurrent cells are allowed for the baselines only.
+# --------------------------------------------------------------------------- #
+RECURRENT_NAMES: frozenset[str] = frozenset(
+    {"LSTM", "GRU", "RNN", "LSTMCell", "GRUCell", "RNNCell", "RNNBase"}
+)
+BASELINES_DIR = SRC_ROOT / "aiayn" / "models" / "baselines"
+
+
+def find_recurrent_uses(source: str) -> list[str]:
+    hits = []
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Attribute) and node.attr in RECURRENT_NAMES:
+            hits.append(f"line {node.lineno}: {_dotted_name(node) or node.attr}")
+        elif isinstance(node, ast.ImportFrom):
+            hits += [
+                f"line {node.lineno}: import {a.name}"
+                for a in node.names
+                if a.name in RECURRENT_NAMES
+            ]
+    return hits
+
+
+def test_recurrent_checker_flags_usage() -> None:
+    assert find_recurrent_uses("import torch\nm = torch.nn.LSTM(2, 2)")
+    assert find_recurrent_uses("from torch.nn import GRUCell")
+    assert not find_recurrent_uses("lstm_hidden = 3  # nn.LSTM in a comment")
+
+
+def test_recurrent_modules_only_in_baselines() -> None:
+    violations = []
+    for path in sorted(SRC_ROOT.rglob("*.py")):
+        if BASELINES_DIR in path.parents:
+            continue
+        violations += [
+            f"{path.relative_to(SRC_ROOT)} {hit}"
+            for hit in find_recurrent_uses(path.read_text(encoding="utf-8"))
+        ]
+    assert not violations, "recurrent modules outside models/baselines:\n" + "\n".join(violations)

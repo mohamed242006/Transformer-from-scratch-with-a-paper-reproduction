@@ -1,0 +1,15 @@
+# Baseline 3, the strongest RNN (DESIGN.md §7, ADR-021): 2-layer bidirectional LSTM
+# encoder, 2-layer LSTM decoder, global "general" attention (Luong et al., 2015;
+# without input feeding, so teacher-forced training runs in parallel over time).
+# 7,580,496 parameters with the 8k joint vocabulary (+0.04% vs transformer_tiny's 7,577,600).
+name: bilstm_luong
+architecture: rnn
+cell: lstm
+attention: luong
+embedding_dim: 256
+hidden_size: 296
+num_layers: 2
+bidirectional_encoder: true
+dropout: 0.3
+tie_weights: true
+max_positions: 1024
