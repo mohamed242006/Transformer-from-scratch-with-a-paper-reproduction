@@ -26,6 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from aiayn.evaluation.significance import PairedResult, paired_bootstrap
+from aiayn.evaluation.statistics import format_p
 from aiayn.inference.evaluate import load_references
 from aiayn.utils.config import load_yaml
 
@@ -221,7 +222,7 @@ def build_comparison(
         ci = p = "-"
         if paired is not None:
             ci = f"±{paired[i].bleu_ci:.2f}"
-            p = "ref" if i == 0 else _fmt(paired[i].bleu_p, ".4f")
+            p = "ref" if i == 0 else format_p(paired[i].bleu_p, n_samples)
         delta = "ref" if i == 0 else f"{e['bleu'] - ref.eval['bleu']:+.2f}"
         lines.append(
             f"| `{r.name}` | {r.description} | {r.parameters:,} | {r.seed} | "

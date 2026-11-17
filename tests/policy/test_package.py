@@ -20,6 +20,7 @@ SUBPACKAGES = [
     "aiayn.evaluation",
     "aiayn.tracking",
     "aiayn.diagnostics",
+    "aiayn.study",
 ]
 
 

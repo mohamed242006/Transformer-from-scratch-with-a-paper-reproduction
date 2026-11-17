@@ -4,7 +4,8 @@
     translator.translate(["A man rides a bike."])            # -> ["Ein Mann fährt Fahrrad."]
 
 Checkpoint choices: ``"best"`` (best validation NLL), ``"last"`` (``last.pt``, falling back
-to ``last.prev.pt``), ``"averaged"`` (mean of the run's ``avg/`` snapshots), or a path.
+to ``last.prev.pt``), ``"averaged"`` (mean of the run's ``avg/`` snapshots, or the stored
+``averaged.pt`` of a slimmed run), or a path.
 """
 
 from __future__ import annotations
@@ -69,6 +70,8 @@ def _weights(run_dir: Path, checkpoint: str, average_last: int | None) -> dict[s
         except Exception:  # truncated by a killed session (ADR-013): use the previous state
             return load_weights(ckpt_dir / "last.prev.pt")
     if checkpoint == "averaged":
+        if average_last is None and (ckpt_dir / "averaged.pt").is_file():
+            return load_weights(ckpt_dir / "averaged.pt")  # slimmed run (ADR-022)
         return average_checkpoint_files(snapshot_paths(run_dir, average_last))
     return load_weights(Path(checkpoint))
 

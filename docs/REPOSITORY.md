@@ -55,12 +55,12 @@ Status markers: **[W1]** created in Week 1 · *(Wn)* populated in that week.
 │
 ├── experiments/                    [W1] (W5+) one folder per run: metadata + metrics, no weights in git
 │
-├── notebooks/                      [W5] kaggle_validate.ipynb, kaggle_train.ipynb · (later) analysis
+├── notebooks/                      [W5] kaggle_validate.ipynb, kaggle_train.ipynb; [W8] kaggle_study.ipynb
 │
 ├── scripts/                        [W2–W5] prepare_data, train_tokenizer, inspect_data, count_params,
 │                                   kaggle_validate, package_for_kaggle, train, evaluate,
 │                                   translate, average_checkpoints, report, kaggle_publish_runs,
-│                                   compare_runs
+│                                   compare_runs, run_study, analyze_study
 ├── dist/                           (gitignored) build output: dist/kaggle/ dataset bundles (ADR-016)
 │
 ├── src/
@@ -78,9 +78,10 @@ Status markers: **[W1]** created in Week 1 · *(Wn)* populated in that week.
 │       ├── inference/              [W6] decoding (greedy, beam), averaging, translator, evaluate, report;
 │       │                           [W7] comparison (fairness checks, COMPARISON.md)
 │       ├── evaluation/             [W6] metrics: sacreBLEU, lowercased BLEU, chrF, exact match, by-length;
-│       │                           [W7] paired bootstrap significance
+│       │                           [W7] paired bootstrap significance; [W8] statistics (multi-seed tests)
 │       ├── tracking/               [W5] loggers.py: stdout, jsonl (source of truth), TensorBoard, W&B
-│       └── diagnostics/            [W5p/W6] Kaggle validation, packaging, kaggle_runs (persistence)
+│       ├── diagnostics/            [W5p/W6] Kaggle validation, packaging, kaggle_runs (persistence)
+│       └── study/                  [W8] config, plan (selection rules), runner, storage (slimming), analysis
 │
 └── tests/                          [W1]
     ├── conftest.py                 [W2] synthetic corpora, tiny tokenizer config, CharTokenizer
@@ -123,7 +124,8 @@ Dependencies point **downwards only**. Lower layers never import higher ones.
 | `tracking` | `utils`, wandb/tensorboard (optional) | `modules`, `models`, `data`, `training` |
 | `inference` | `models`, `modules`, `data`, `evaluation`, `utils` | `training` (ADR-019: the evaluation pipeline decodes, then scores) |
 | `training` | `models`, `data`, `evaluation`, `tracking`, `inference`, `utils` | none of the above restrictions |
-| `diagnostics` | everything (platform validation and packaging sit on top) | — (nothing may import `diagnostics`) |
+| `diagnostics` | everything except `study` (platform validation and packaging) | only `study` may import it (run discovery) |
+| `study` | everything (multi-seed studies orchestrate training, inference and evaluation; ADR-022) | — (only scripts and notebooks import it) |
 
 Enforcement: an AST-based layering test in `tests/policy/` (added in Week 2, when the first cross-package import exists).
 
@@ -244,6 +246,12 @@ Each entry lists **Owner**, **Responsibilities**, **Acceptable contents** and **
 - **Responsibilities:** platform validation for Kaggle and local machines (environment, dependencies, CUDA, data, tokenizer, model, VRAM, throughput) and Kaggle Dataset packaging (ADR-016).
 - **Acceptable:** check functions returning `Outcome`, report serialization, packaging helpers.
 - **Forbidden:** training logic (it belongs in `training/`); being imported by any other package; network access other than the optional reachability probe and pinned downloads.
+
+### `src/aiayn/study/`
+- **Owner:** Research owner
+- **Responsibilities:** declarative multi-seed studies (ADR-022): plan expansion, validation-only selection rules, execution within a session budget, slimming of completed runs, the statistical report (`STUDY.md`).
+- **Acceptable:** orchestration, selection rules, report formatting; statistics are called from `evaluation/`.
+- **Forbidden:** model or training logic; selecting anything on test data; being imported by any other package.
 
 ### `tests/`
 - **Owner:** shared. Each test directory mirrors the owner of the code under test. `policy/` belongs to the Infra owner.

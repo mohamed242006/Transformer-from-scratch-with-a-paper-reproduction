@@ -215,3 +215,22 @@ The default `RUNS` list trains the three RNN baselines after the Transformer ref
 Locally: `python scripts/compare_runs.py --run runs/multi30k_tiny_s1 --run runs/multi30k_bilstm_luong_s1 ... --out runs/COMPARISON.md`. The first run is the reference. Exit code 1 means a fairness check failed.
 
 More seeds: add `("configs/experiment/<exp>.yaml", "<exp>_s2")` entries with `OVERRIDES = ["train.seed=2"]`. Overrides apply to new runs only. The comparison adds a mean ± std table.
+
+## 11. The Week 8 study (ADR-022)
+`notebooks/kaggle_study.ipynb` runs `configs/study/week8.yaml`. That is about 110 runs: 5-seed main comparison, decoding grid, training sensitivity, tuned configs and Transformer ablations. Expect about 9 T4-hours, so one or two sessions.
+
+**Each session:**
+1. Use the same secrets as §9, GPU T4, Internet on, and **add the `aiayn-runs` dataset** as input. It holds the Week 7 seed-1 runs, which are reused.
+2. **Save Version → Save & Run All (Commit).** The study runner:
+   - reuses every finished run it finds;
+   - works through the plan in priority order;
+   - stops about 40 minutes before the session limit;
+   - writes `runs/STUDY.md` and `STUDY.json`, also copied into `multi30k_tiny_s1/`;
+   - publishes all study runs, each slimmed to ~30–60 MB, as a new `aiayn-runs` version.
+3. If the notebook prints `run again to continue` (exit 3), wait until the new `aiayn-runs` version shows as ready, then repeat with it attached. The study is done when `STUDY.md` says **complete**.
+
+**Locally:**
+- `python scripts/run_study.py --study configs/study/week8.yaml --work runs --dry-run` lists the remaining tasks.
+- `python scripts/analyze_study.py --study configs/study/week8.yaml --work runs --input <downloaded aiayn-runs> --out runs/STUDY.md --prepare-data` rebuilds the report from downloaded runs.
+
+A diverged run (for example at LR ×2) is recorded as `FAILED.json` and reported in the tables. It is never retried, and in the selection it counts as the worst option.

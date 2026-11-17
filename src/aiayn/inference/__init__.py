@@ -18,7 +18,7 @@ from aiayn.inference.decoding import (
     greedy_decode,
     length_penalty,
 )
-from aiayn.inference.evaluate import evaluate_run, load_references
+from aiayn.inference.evaluate import decode_tag, eval_tag, evaluate_run, load_references
 from aiayn.inference.report import build_run_report, write_run_report
 from aiayn.inference.translator import RunInfo, Translator, load_run
 
@@ -32,6 +32,8 @@ __all__ = [
     "beam_search",
     "build_comparison",
     "build_run_report",
+    "decode_tag",
+    "eval_tag",
     "evaluate_run",
     "greedy_decode",
     "length_penalty",

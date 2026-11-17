@@ -109,9 +109,9 @@ CV bullets only with numbers that exist in `docs/results.md` with linked runs. M
 | 4 ✅ | Full model | Overfits one batch; full-stack parity |
 | 5 ✅ | Training system | Copy task 100%; Multi30k converges |
 | 6 ✅ | Inference + evaluation | First BLEU; beam=1 equals greedy |
-| 7 | Baselines (ADR-021) | All baselines through the same pipeline |
-| 8 | IWSLT14 main benchmark (+ pin IWSLT14 source, ADR-022) | Headline table, 3 seeds, significance |
-| 9 | Ablations | Table-3-style results |
+| 7 ✅ | Baselines (ADR-021) | All baselines through the same pipeline |
+| 8 | Multi30k study: multi-seed, sensitivity, ablations, statistics (ADR-022) | 5-seed comparison, Table-3-style ablations, significance, final experimental report |
+| 9 | IWSLT14 main benchmark (ADR-023; rescheduled from Week 8) | Headline table on IWSLT14, same study protocol |
 | 10 | Analysis and figures | §11.3 figures |
 | 11 | Documentation | Reproducible from a fresh clone |
 | 12+ | Extensions (WMT14 removed from scope, ADR-010) | |

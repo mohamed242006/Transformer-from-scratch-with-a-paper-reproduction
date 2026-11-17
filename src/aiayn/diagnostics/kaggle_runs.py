@@ -28,6 +28,7 @@ __all__ = [
     "UPLOAD_EXCLUDES",
     "PublishResult",
     "find_runs",
+    "index_runs",
     "kaggle_credentials_available",
     "latest_run",
     "publish_dataset",
@@ -77,6 +78,25 @@ def find_runs(name: str, roots: Sequence[Path], *, unzip_into: Path | None = Non
         if meta.parent.name == name and (meta.parent / "config.yaml").is_file()
     }
     return sorted(found)
+
+
+def index_runs(roots: Sequence[Path], *, unzip_into: Path | None = None) -> dict[str, Path]:
+    """One scan of ``roots``: run name -> its most advanced copy (see ``latest_run``)."""
+    search = [Path(r) for r in roots if Path(r).exists()]
+    if unzip_into is not None:
+        for root in list(search):
+            search += _extract_zips(root, unzip_into)
+    best: dict[str, Path] = {}
+    for root in search:
+        for run in _all_runs(root):
+            current = best.get(run.name)
+            key = (run_progress(run), (run / "metadata.json").stat().st_mtime)
+            if current is None or key > (
+                run_progress(current),
+                (current / "metadata.json").stat().st_mtime,
+            ):
+                best[run.name] = run
+    return best
 
 
 def latest_run(name: str, roots: Sequence[Path], *, unzip_into: Path | None = None) -> Path | None:

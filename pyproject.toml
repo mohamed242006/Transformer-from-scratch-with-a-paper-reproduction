@@ -90,7 +90,7 @@ select = [
 # N806: uppercase math names (Q, K, V, W) inside functions mirror the paper's notation.
 ignore = ["N812", "N806"]
 # Math notation in docstrings mirrors the paper and docs/math.md.
-allowed-confusables = ["γ", "−", "×", "–", "σ", "ρ", "ν"]
+allowed-confusables = ["γ", "−", "×", "–", "σ", "ρ", "ν", "α"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["aiayn", "tests"]

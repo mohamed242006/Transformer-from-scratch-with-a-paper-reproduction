@@ -228,3 +228,36 @@ Week 6 exit criterion met: first real BLEU. The length ratio of 0.963 means slig
 **Next action:** run `notebooks/kaggle_train.ipynb` (default `RUNS`, `aiayn-runs` attached) as Save & Run All (Commit), then record `COMPARISON.md` here.
 
 **Expected:** Transformer > BiLSTM+Luong ≳ GRU+Bahdanau ≫ LSTM without attention. A baseline beating the Transformer on Multi30k would not be implausible at this scale and would be reported as such.
+
+---
+
+## 2026-11-17 · Week 7 results · Week 8 study plan
+
+**Week 7 comparison** (`COMPARISON.md`; test 2016, averaged checkpoint, beam 4, α 0.6, seed 1; all fairness checks PASS):
+
+| Model | Params | Valid NLL | BLEU (95% CI) | ΔBLEU | p | chrF | Len ratio | Wall (min) | tgt tok/s |
+|---|---|---|---|---|---|---|---|---|---|
+| Transformer 3+3, d=256 | 7,577,600 | 1.910 | **36.87** (±1.63) | ref | | 60.74 | 0.963 | 4.1 | 62,797 |
+| BiGRU + Bahdanau | 7,513,536 | 2.212 | 34.14 (±1.58) | −2.73 | ≤ 0.001 | 59.21 | 1.039 | 5.3 | 47,942 |
+| BiLSTM + Luong | 7,580,496 | 2.343 | 32.65 (±1.60) | −4.22 | ≤ 0.001 | 56.65 | 1.024 | 2.8 | 99,054 |
+| LSTM, no attention | 7,536,384 | 3.072 | 12.28 (±0.85) | −24.59 | ≤ 0.001 | 35.42 | 1.094 | 2.4 | 115,076 |
+
+(`COMPARISON.md` printed p = 0.0010. That value is the floor of a 1000-sample bootstrap, so the formatter now prints "≤0.001".)
+
+**Reading:**
+- **Attention is the dominant factor.** Without it, the fixed-size encoder state costs 20+ BLEU.
+- **The Transformer leads the best RNN by 2.7 BLEU** at matched size, data and decoding. Its lower validation NLL (1.910 vs 2.212) agrees with the BLEU ordering.
+- **Bahdanau beat Luong,** against expectation. Plausible causes are Luong without input feeding (ADR-021 §3) and the smaller hidden size Luong needs at matched parameters (296 vs 448). Week 8's sensitivity grid tests the hyperparameter side.
+- **Output lengths differ systematically:** RNNs run long (1.02–1.09), the Transformer short (0.963). One shared α = 0.6 favours neither, which is why Week 8 selects decoding per model on valid.
+- **Speed:** at this tiny scale the cuDNN LSTMs are faster per token than the hand-written Transformer (99–115k vs 63k tok/s). The Bahdanau decoder is slowest because it runs a Python loop over time steps. The Transformer's parallelism advantage is expected to appear at larger scale (not tested here).
+- **Caveat:** single seed. The ±1.6 CIs cover test sampling only. Week 8 adds training variance.
+
+**Week 8 plan (ADR-022):** `configs/study/week8.yaml`, about 110 runs and about 9 T4-hours:
+- main comparison on 5 seeds;
+- valid-selected decoding (beam × α grid);
+- training sensitivity (LR ×0.5/×2, dropout 0.1–0.4) with valid-NLL selection of a tuned config;
+- 10 Transformer ablations (Table 3 style).
+
+Statistics: two-level (sentences × seeds) paired bootstrap with Holm correction, plus seed permutation tests. The roadmap changed: IWSLT14 moves to Week 9 (ADR-023, planned).
+
+**Next action:** run `notebooks/kaggle_study.ipynb` with `aiayn-runs` attached until `STUDY.md` reports *complete*, then turn it into `docs/results.md`.

@@ -21,6 +21,7 @@ ALL = {
     "inference",
     "training",
     "diagnostics",
+    "study",
 }
 
 ALLOWED: dict[str, set[str]] = {
@@ -31,9 +32,12 @@ ALLOWED: dict[str, set[str]] = {
     "evaluation": {"utils"},
     "tracking": {"utils"},
     "inference": {"models", "modules", "data", "evaluation", "utils"},
-    "training": ALL - {"training", "diagnostics"},
-    # Platform validation/packaging sits on top of everything; nothing imports it.
-    "diagnostics": ALL - {"diagnostics"},
+    "training": ALL - {"training", "diagnostics", "study"},
+    # Platform validation/packaging sits on top of everything except studies.
+    "diagnostics": ALL - {"diagnostics", "study"},
+    # Studies orchestrate everything (run discovery comes from diagnostics); only
+    # scripts and notebooks import them.
+    "study": ALL - {"study"},
 }
 
 # Third-party modules restricted to specific packages.

@@ -22,7 +22,7 @@ from aiayn.evaluation.metrics import bleu_by_length, corpus_scores
 from aiayn.inference.decoding import DecodeConfig
 from aiayn.inference.translator import Translator, load_run
 
-__all__ = ["evaluate_run", "load_references"]
+__all__ = ["decode_tag", "eval_tag", "evaluate_run", "load_references"]
 
 
 def _copy_split(info: Any, split: Split) -> tuple[list[list[int]], list[str]]:
@@ -43,6 +43,31 @@ def _copy_split(info: Any, split: Split) -> tuple[list[list[int]], list[str]]:
         sources.append(ex.src[:-1].tolist())
         references.append(" ".join(map(str, ex.tgt[1:-1].tolist())))
     return sources, references
+
+
+DEFAULT_DECODE = DecodeConfig()
+
+
+def decode_tag(decode: DecodeConfig) -> str:
+    """``greedy`` | ``beam4`` (paper α) | ``beam8-a1`` (other α).
+
+    Greedy ignores the length penalty for token choice, so α never appears in its tag.
+    Length limits are not part of the tag (unchanged since Week 6); every result JSON
+    records the full decode settings.
+    """
+    if decode.beam_size == 1:
+        return "greedy"
+    tag = f"beam{decode.beam_size}"
+    if decode.length_penalty != DEFAULT_DECODE.length_penalty:
+        tag += f"-a{decode.length_penalty:g}"
+    return tag
+
+
+def eval_tag(split: str, checkpoint: str, decode: DecodeConfig) -> str:
+    """File stem of an evaluation: ``<split>.<checkpoint>.<decode_tag>``."""
+    named = checkpoint in ("best", "last", "averaged")
+    ckpt_tag = checkpoint if named else Path(checkpoint).stem
+    return f"{split}.{ckpt_tag}.{decode_tag(decode)}"
 
 
 def _translation_split(info: Any, split: Split, prepare_data: bool) -> tuple[list[str], list[str]]:
@@ -104,10 +129,7 @@ def evaluate_run(
     seconds = time.perf_counter() - start
 
     scores = corpus_scores(hypotheses, references)
-    named = checkpoint in ("best", "last", "averaged")
-    ckpt_tag = checkpoint if named else Path(checkpoint).stem
-    search_tag = "greedy" if decode.beam_size == 1 else f"beam{decode.beam_size}"
-    tag = f"{split}.{ckpt_tag}.{search_tag}"
+    tag = eval_tag(split, checkpoint, decode)
     result: dict[str, Any] = {
         "run": info.name,
         "split": split,
