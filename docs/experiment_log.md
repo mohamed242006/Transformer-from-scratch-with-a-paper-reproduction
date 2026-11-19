@@ -346,3 +346,24 @@ Week 8's config pins its old rules.
 **Local check (CPU):** the validator ran on the IWSLT14 config and every critical check passed: data counts, tokenizer fingerprint, exact parameter counts (36,663,296 / 36,565,136 / 36,606,112) and initial cross-entropy within its band. **Risk:** the CPU memory *estimate* for the worst-case batch (8,192 tokens of length 256) is 16,305 MiB for GRU + Bahdanau, above a T4's ~15,000 MiB; additive attention keeps a [B, T, S, 1104] tensor and grows with length squared. The Transformer (5,784) and BiLSTM + Luong (2,691) fit. The Kaggle validation step measures the real value before the pilot.
 
 **Results:** none yet. Phase 1 runs on Kaggle (owner), then results go here.
+
+---
+
+## 2026-11-19 · Week 9 Phase 1 blocker: Kaggle preflight collection failure (fixed)
+
+**Symptom:** `kaggle_validate.ipynb` stopped at the preflight tests. pytest could not collect the parity and numerical suites: `ModuleNotFoundError: No module named 'tests.parity'` (and `'tests.conftest'`).
+
+**Root cause:**
+- `tests/` had no `__init__.py`, so `tests` was an implicit namespace package.
+- When Python resolves an import, a *regular* package (one with `__init__.py`) anywhere on `sys.path` beats namespace portions found earlier.
+- The Kaggle image evidently contains some installed package that ships a top-level `tests/__init__.py`. It captured `import tests`, and `tests.parity` / `tests.conftest` do not exist in it.
+- **Why it passed locally:** the local environment has no such package.
+- **Reproduced locally** by putting a fake regular `tests` package on `PYTHONPATH`: identical errors.
+
+**Fix:**
+- `__init__.py` in `tests/` and every test subfolder. pytest's `pythonpath` puts the repository root first, so this repository's regular package wins.
+- A policy test (`test_test_helpers_resolve_to_this_repository`) fails with a clear message if `tests` is ever shadowed again.
+- `tests/unit/test_pilot.py` loads `scripts/pilot_report.py` by file path. `scripts` is an equally generic top-level name.
+- **Verified:** with the fake shadowing package present, the policy, parity and numerical suites pass. Full suite: 641 passed.
+
+**Lesson:** never rely on generic top-level names (`tests`, `scripts`, `utils`) as implicit namespace packages in environments with large, unknown site-packages.

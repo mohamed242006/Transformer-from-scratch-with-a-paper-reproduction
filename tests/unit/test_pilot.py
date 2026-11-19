@@ -3,18 +3,33 @@
 
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 from typing import Any
 
 import pytest
-from scripts.pilot_report import main as pilot_main
 
 from aiayn.study import StudyEnv, collect_states, load_study
 from aiayn.study.pilot import build_pilot_report, validation_report_summary, write_pilot_report
 from aiayn.study.plan import default_valid, main_run, sensitivity_variants, variant_run
 
 REPO = Path(__file__).resolve().parents[2]
+
+
+def _load_script(name: str) -> Any:
+    """Import ``scripts/<name>.py`` by path: ``scripts`` is a generic top-level name that
+    an installed package could shadow (the cause of the Kaggle ``tests.parity`` failure)."""
+    spec = importlib.util.spec_from_file_location(
+        f"_aiayn_script_{name}", REPO / "scripts" / f"{name}.py"
+    )
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+pilot_main = _load_script("pilot_report").main
 STUDY = REPO / "configs" / "study" / "week9_pilot.yaml"
 
 

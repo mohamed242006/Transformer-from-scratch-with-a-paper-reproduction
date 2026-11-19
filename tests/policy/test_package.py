@@ -56,3 +56,15 @@ def test_every_adr_is_indexed() -> None:
     assert adrs, "no ADRs found"
     unindexed = [name for name in adrs if name not in index]
     assert not unindexed, f"ADRs missing from docs/decisions/README.md: {unindexed}"
+
+
+def test_test_helpers_resolve_to_this_repository() -> None:
+    """The suite imports helpers as ``tests.conftest`` / ``tests.parity.adapters``. A
+    third-party regular package named ``tests`` earlier on sys.path would shadow them and
+    break collection (Kaggle, Week 9). ``tests`` must be this repository's package."""
+    import tests
+    import tests.parity.adapters
+
+    root = Path(tests.__file__).resolve().parent
+    assert root == REPO_ROOT / "tests", f"'tests' resolves to {root}: shadowed by another package"
+    assert Path(tests.parity.adapters.__file__).resolve().is_relative_to(root)
