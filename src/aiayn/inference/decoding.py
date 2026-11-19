@@ -125,6 +125,21 @@ def _force_eos(lprobs: torch.Tensor, rows: torch.Tensor) -> None:
         lprobs[rows, EOS_ID] = eos
 
 
+def _init_state(
+    model: EncoderDecoder, memory: Any, src_mask: torch.Tensor, autocast_dtype: torch.dtype | None
+) -> Any:
+    """Build the incremental-decoding state under the same autocast as every other model
+    call: the Transformer projects the cached cross-attention keys/values here, and on a
+    GPU (fp16 autocast) they must have the dtype the decoder steps will use."""
+    ctx: Any = (
+        torch.autocast(device_type=src_mask.device.type, dtype=autocast_dtype)
+        if autocast_dtype is not None
+        else contextlib.nullcontext()
+    )
+    with ctx:
+        return model.init_state(memory, src_mask)
+
+
 def _encode(
     model: EncoderDecoder, src: torch.Tensor, autocast_dtype: torch.dtype | None
 ) -> tuple[Any, torch.Tensor]:
@@ -162,7 +177,7 @@ def greedy_decode(
     scores = torch.zeros(batch, dtype=torch.float64, device=src.device)
     finished = torch.zeros(batch, dtype=torch.bool, device=src.device)
     use_cache = model.supports_incremental if incremental is None else incremental
-    state = model.init_state(memory, src_mask) if use_cache else None
+    state = _init_state(model, memory, src_mask, autocast_dtype) if use_cache else None
     for step in range(1, max(limits) + 1):
         if use_cache:
             lprobs = _incremental_log_probs(model, tokens[:, -1], state, autocast_dtype)
@@ -210,7 +225,7 @@ def beam_search(
     done = [False] * batch
     row_limits = torch.tensor(limits, device=device).repeat_interleave(k)
     use_cache = model.supports_incremental if incremental is None else incremental
-    state = model.init_state(memory, src_mask) if use_cache else None
+    state = _init_state(model, memory, src_mask, autocast_dtype) if use_cache else None
 
     for step in range(1, max(limits) + 1):
         if use_cache:

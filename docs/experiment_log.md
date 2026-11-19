@@ -387,3 +387,32 @@ Week 8's config pins its old rules.
 **Fix (ADR-023 Amendment 1):** GRU + Bahdanau uses 4,096-token micro-batches × 2 accumulation steps. The effective update size (8,192 tokens), per-update token normalization and learning-rate schedule are identical to the other models. Fairness checks now compare data configs without the micro-batch size and verify the effective update size separately; tested in both directions (equal passes, smaller fails).
 
 **Next:** re-validate GRU at 4,096 on the T4. If it passes, run the pilot. If it fails, use the 2,048 × 4 fallback.
+
+---
+
+## 2026-11-20 · Week 9 Phase 1: pilot stopped after its first run (fixed)
+
+**Symptom (Kaggle):**
+- `iwslt14_pilot_transformer_s1` trained to completion (6,000 updates, best validation NLL 3.526).
+- No other run started. `STUDY.md` listed 1 completed run and `pilot report exit: 3`, with hours of session left.
+
+**Root cause:** a crash in **incremental decoding under autocast** (`aiayn/inference/decoding.py`), not in `study.plan`, `study.runner` or `pilot.py`.
+- **The crash:** `init_state` was called outside the autocast context. It projects the Transformer's cached cross-attention keys and values, so on the T4 they came out fp32, while each decoder step under fp16 autocast produced fp16 queries. The attention raised a dtype mismatch at the first evaluation of the first finished run.
+- **How it surfaced:** the runner evaluates in-process, so the exception ended `run_study.py` with a traceback (non-zero exit).
+- **Why it looked like a clean stop:** the notebook printed the exit code but continued into the report and publish cells.
+
+**Why tests missed it:**
+- every decoding test ran on CPU with autocast off;
+- the fake-training study tests never decode.
+
+**Reproduced locally** with CPU bf16 autocast: prefix decoding OK, incremental decoding `TypeError: dtype mismatch`. Simulating the real `week9_pilot` plan with fake training ran all 10 runs, which rules out the planner and runner.
+
+**Fix:**
+- `_init_state` builds the state under the same autocast as the encoder and decoder steps.
+- New `tests/numerical/test_decoding_autocast.py` decodes under fp16 on CUDA (bf16 on CPU) for every model. It is part of the Kaggle preflight. Verified: it fails without the fix (4 Transformer cases) and passes with it.
+- Study notebook: a crashed runner prints a banner, and the last cell fails after finished runs are reported and published.
+
+**Impact:**
+- **No retraining needed:** the completed Transformer pilot run is valid, since the bug was in decoding only.
+- **Earlier results are unaffected:** Week 6–8 results predate incremental decoding.
+- **Every GPU evaluation since Phase 0 would have crashed,** including `kaggle_train.ipynb`.
