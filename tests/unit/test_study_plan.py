@@ -230,3 +230,114 @@ def test_tuned_runs_appear_after_selection_and_failed_runs_are_skipped(study: An
     failed = main_run(study, "transformer", 2).name
     states[failed] = state(completed=False, failed=True, nll=None)
     assert failed not in [t.run.name for t in tasks(study, states)]
+
+
+# ----------------------------------------------------------------------------- ADR-023
+def test_week8_pins_its_original_rules(study: Any) -> None:
+    assert study.training_selection == "valid_nll" and study.select_checkpoint is False
+
+
+def test_grid_edges_are_flagged(study: Any) -> None:
+    from aiayn.study.plan import EvalSpec, decoding_edges, training_edges
+
+    assert training_edges(study, "transformer", "lr_double") == [
+        "train.schedule.peak_lr at grid maximum"
+    ]
+    assert training_edges(study, "transformer", "lr_half") == [
+        "train.schedule.peak_lr at grid minimum"
+    ]
+    assert training_edges(study, "transformer", "dropout0.2") == []  # interior value
+    assert training_edges(study, "transformer", DEFAULT) == []
+    assert decoding_edges(study, EvalSpec("test", "averaged", 4, 1.5)) == ["alpha at grid maximum"]
+    assert decoding_edges(study, EvalSpec("test", "averaged", 8, 0.0)) == [
+        "beam at grid maximum",
+        "alpha at grid minimum",
+    ]
+    assert decoding_edges(study, EvalSpec("test", "averaged", 1, 0.6)) == []
+
+
+def test_variants_can_be_restricted_to_models_and_groups_are_optional(tmp_path: Path) -> None:
+    from aiayn.study.plan import sensitivity_variants
+
+    path = write_study(
+        tmp_path,
+        sensitivity={
+            "seeds": [1],
+            "variants": {
+                "lr_rnn": {
+                    "overrides": ["train.schedule.peak_lr=2.8e-3"],
+                    "models": ["gru_bahdanau"],
+                },
+                "lr_all": ["train.schedule.peak_lr=1.4e-3"],
+            },
+        },
+        ablations=None,
+    )
+    raw = load_yaml(path)
+    raw.pop("ablations")
+    import yaml
+
+    path.write_text(yaml.safe_dump(raw), encoding="utf-8")
+    study = load_study(path)
+    assert study.ablations.variants == ()
+    assert {v.name for v in sensitivity_variants(study, "gru_bahdanau")} == {"lr_rnn", "lr_all"}
+    assert [v.name for v in sensitivity_variants(study, "transformer")] == ["lr_all"]
+    names = {r.name for r in planned_runs(study)}
+    assert "multi30k_gru_bahdanau-lr_rnn_s1" in names and "multi30k_tiny-lr_rnn_s1" not in names
+    with pytest.raises(ConfigError, match="not in this group"):
+        load_study(
+            write_study(
+                tmp_path,
+                sensitivity={
+                    "models": ["transformer"],
+                    "seeds": [1],
+                    "variants": {
+                        "x": {"overrides": ["model.dropout=0.2"], "models": ["gru_bahdanau"]}
+                    },
+                },
+            )
+        )
+
+
+def test_valid_bleu_selection_breaks_ties_with_nll(tmp_path: Path) -> None:
+    from aiayn.study.plan import default_valid
+
+    study = load_study(write_study(tmp_path, training_selection="valid_bleu"))
+    tag = default_valid(study).tag
+
+    def bleu_state(bleu: float, nll: float) -> RunState:
+        return state(nll=nll, evals={tag: bleu})
+
+    states = {}
+    for seed in study.sensitivity.seeds:
+        states[main_run(study, "transformer", seed).name] = bleu_state(36.0, 1.92)
+        for v in study.sensitivity.variants:
+            if is_alias(study, "transformer", v):
+                continue
+            name = variant_run(study, "transformer", "sensitivity", v, seed).name
+            bleu, nll = {"lr_double": (38.0, 1.84), "dropout0.2": (38.0, 1.83)}.get(
+                v.name, (30.0, 2.0)
+            )
+            states[name] = bleu_state(bleu, nll)
+    assert select_training(study, "transformer", states) == "dropout0.2"  # tie -> lower NLL
+    first = variant_run(study, "transformer", "sensitivity", study.sensitivity.variants[1], 1).name
+    states[first] = state(nll=1.84)  # completed but not yet evaluated on valid
+    assert select_training(study, "transformer", states) is None
+
+
+def test_checkpoint_selection(tmp_path: Path) -> None:
+    from aiayn.study.plan import checkpoint_evals, select_checkpoint
+
+    study = load_study(write_study(tmp_path, select_checkpoint=True))
+    averaged, best = (s.tag for s in checkpoint_evals(study))
+    states = {
+        main_run(study, "gru_bahdanau", s).name: state(evals={averaged: 34.0, best: 34.5})
+        for s in study.decoding.seeds
+    }
+    assert select_checkpoint(study, "gru_bahdanau", states) == "best"
+    states = {
+        main_run(study, "gru_bahdanau", s).name: state(evals={averaged: 34.0, best: 34.0})
+        for s in study.decoding.seeds
+    }
+    assert select_checkpoint(study, "gru_bahdanau", states) == "averaged"  # tie keeps protocol
+    assert select_checkpoint(study, "gru_bahdanau", {}) is None

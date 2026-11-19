@@ -7,7 +7,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from aiayn.utils.config import ConfigError, load_yaml
 from aiayn.utils.paths import find_repo_root, resolve_path
@@ -21,6 +21,12 @@ _NAME = re.compile(r"^[a-z0-9_.]+$")
 class Variant:
     name: str
     overrides: tuple[str, ...]
+    #: Restrict to these model keys (None = every model of the group), e.g. one LR grid
+    #: per model family (ADR-023).
+    models: tuple[str, ...] | None = None
+
+    def applies_to(self, model: str) -> bool:
+        return self.models is None or model in self.models
 
 
 @dataclass(frozen=True)
@@ -50,6 +56,14 @@ class StudyConfig:
     bootstrap_samples: int = 1000
     default_beam: int = 4
     default_alpha: float = 0.6
+    #: How the tuned training configuration is chosen (ADR-023: valid BLEU; Week 8 used
+    #: valid NLL, which produced a 0.0002-nat coin flip).
+    training_selection: Literal["valid_bleu", "valid_nll"] = "valid_bleu"
+    #: Choose best vs averaged checkpoint per model on validation (ADR-023).
+    select_checkpoint: bool = True
+
+
+EMPTY_GROUP = VariantGroup((), (), ())
 
 
 def _seeds(raw: Any, where: str) -> tuple[int, ...]:
@@ -64,18 +78,32 @@ def _variants(raw: Any, where: str) -> tuple[Variant, ...]:
     if not isinstance(raw, Mapping) or not raw:
         raise ConfigError(f"{where}: expected a mapping of variant name -> override list")
     out = []
-    for name, overrides in raw.items():
+    for name, spec in raw.items():
         if not _NAME.match(str(name)) or name == "default":
             raise ConfigError(f"{where}.{name}: invalid variant name")
+        only: tuple[str, ...] | None = None
+        overrides = spec
+        if isinstance(spec, Mapping):  # {overrides: [...], models: [...]}
+            if set(spec) - {"overrides", "models"} or "overrides" not in spec:
+                raise ConfigError(
+                    f"{where}.{name}: expected keys 'overrides' and optional 'models'"
+                )
+            overrides = spec["overrides"]
+            if "models" in spec:
+                if not isinstance(spec["models"], list) or not spec["models"]:
+                    raise ConfigError(f"{where}.{name}.models: expected a non-empty list")
+                only = tuple(str(m) for m in spec["models"])
         if not isinstance(overrides, list) or not all(isinstance(o, str) for o in overrides):
             raise ConfigError(f"{where}.{name}: expected a list of 'group.key=value' strings")
         if any(o.startswith("train.seed=") for o in overrides):
             raise ConfigError(f"{where}.{name}: seeds come from the study, not the variant")
-        out.append(Variant(str(name), tuple(overrides)))
+        out.append(Variant(str(name), tuple(overrides), only))
     return tuple(out)
 
 
 def _group(raw: Any, where: str, models: Mapping[str, Path]) -> VariantGroup:
+    if raw is None:
+        return EMPTY_GROUP
     if not isinstance(raw, Mapping):
         raise ConfigError(f"{where}: expected a mapping")
     unknown = set(raw) - {"models", "seeds", "variants"}
@@ -86,11 +114,18 @@ def _group(raw: Any, where: str, models: Mapping[str, Path]) -> VariantGroup:
     missing = [k for k in keys if k not in models]
     if missing:
         raise ConfigError(f"{where}.models: unknown model keys {missing}")
-    return VariantGroup(
-        keys,
-        _seeds(raw.get("seeds"), f"{where}.seeds"),
-        _variants(raw.get("variants"), f"{where}.variants"),
-    )
+    variants = _variants(raw.get("variants"), f"{where}.variants")
+    for v in variants:
+        stray = [m for m in v.models or () if m not in keys]
+        if stray:
+            raise ConfigError(f"{where}.variants.{v.name}: models {stray} are not in this group")
+    return VariantGroup(keys, _seeds(raw.get("seeds"), f"{where}.seeds"), variants)
+
+
+def _choice(value: Any, allowed: tuple[str, ...], path: Path) -> Any:
+    if value not in allowed:
+        raise ConfigError(f"{path}: training_selection must be one of {allowed}, got {value!r}")
+    return value
 
 
 def load_study(path: str | Path) -> StudyConfig:
@@ -98,7 +133,8 @@ def load_study(path: str | Path) -> StudyConfig:
     raw = load_yaml(path)
     allowed = {
         "name", "reference", "models", "main_seeds", "decoding", "sensitivity", "ablations",
-        "bootstrap_samples", "default_beam", "default_alpha",
+        "bootstrap_samples", "default_beam", "default_alpha", "training_selection",
+        "select_checkpoint",
     }  # fmt: skip
     unknown = set(raw) - allowed
     if unknown:
@@ -148,6 +184,10 @@ def load_study(path: str | Path) -> StudyConfig:
         bootstrap_samples=int(raw.get("bootstrap_samples", 1000)),
         default_beam=int(raw.get("default_beam", 4)),
         default_alpha=float(raw.get("default_alpha", 0.6)),
+        training_selection=_choice(
+            raw.get("training_selection", "valid_bleu"), ("valid_bleu", "valid_nll"), path
+        ),
+        select_checkpoint=bool(raw.get("select_checkpoint", True)),
     )
     if not _NAME.match(study.name):
         raise ConfigError(f"{path}: invalid study name {study.name!r}")

@@ -25,6 +25,9 @@ dependencies = [
     "pyyaml>=6.0",
     "sentencepiece>=0.2.0",
     "sacrebleu>=2.4",
+    # Moses tokenizer port: IWSLT14 split membership and fairseq-style BLEU (ADR-023).
+    # Pinned: its tokenization decides which training pairs survive cleaning.
+    "sacremoses==0.2.0",
 ]
 
 [project.optional-dependencies]
@@ -112,5 +115,5 @@ strict = true
 warn_unreachable = true
 
 [[tool.mypy.overrides]]
-module = ["sentencepiece.*", "sacrebleu.*", "wandb.*"]
+module = ["sentencepiece.*", "sacrebleu.*", "sacremoses.*", "wandb.*"]
 ignore_missing_imports = true

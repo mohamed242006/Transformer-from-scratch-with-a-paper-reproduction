@@ -1,5 +1,6 @@
 """Corpus metrics (ADR-006): sacreBLEU (primary, cased), lowercased BLEU (secondary, for
-comparison with lowercased literature numbers), chrF, exact match, and BLEU by length.
+comparison with lowercased literature numbers), chrF, exact match, BLEU by length, and the
+fairseq-style tokenized lowercased BLEU used by IWSLT14 papers (ADR-023, protocol B).
 
 This module is the only place that imports ``sacrebleu`` (enforced by the layering test).
 It works on strings only and never imports models.
@@ -8,12 +9,13 @@ It works on strings only and never imports models.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from functools import lru_cache
 from typing import Any
 
 from sacrebleu.metrics.bleu import BLEU
 from sacrebleu.metrics.chrf import CHRF
 
-__all__ = ["bleu_by_length", "corpus_scores", "exact_match"]
+__all__ = ["bleu_by_length", "corpus_scores", "exact_match", "fairseq_bleu", "fairseq_normalize"]
 
 DEFAULT_EDGES: tuple[int, ...] = (10, 20, 30, 40)
 
@@ -35,8 +37,50 @@ def exact_match(hypotheses: Sequence[str], references: Sequence[str]) -> float:
     return same / len(hypotheses)
 
 
-def corpus_scores(hypotheses: Sequence[str], references: Sequence[str]) -> dict[str, Any]:
-    """Corpus-level scores with sacreBLEU signatures (detokenized text in, ADR-006)."""
+FAIRSEQ_SIGNATURE = (
+    "fairseq-style|moses:sacremoses-{version}|escape|lc|apostrophe:U+2019->'|"
+    "sacrebleu tok:none|smooth:none|nrefs:1"
+)
+
+
+@lru_cache(maxsize=4)
+def _moses(lang: str) -> Any:
+    from sacremoses import MosesTokenizer
+
+    return MosesTokenizer(lang=lang)
+
+
+def fairseq_normalize(text: str, lang: str) -> str:
+    """fairseq's IWSLT14 reference processing (``prepare-iwslt14.sh``): U+2019 -> ', Moses
+    ``tokenizer.perl -l <lang>`` (escaping on), lowercase. Applied to hypotheses too."""
+    tokenized = _moses(lang).tokenize(text.replace("\u2019", "'"), escape=True, return_str=True)
+    return str(tokenized).lower()
+
+
+def fairseq_bleu(
+    hypotheses: Sequence[str], references: Sequence[str], lang: str
+) -> tuple[float, str]:
+    """Tokenized lowercased corpus BLEU as ``multi-bleu.perl``/``fairseq-score`` compute it.
+
+    Returns ``(score, signature)``. Not comparable to sacreBLEU numbers (ADR-006, ADR-023).
+    """
+    _check(hypotheses, references)
+    from importlib.metadata import version
+
+    hyps = [fairseq_normalize(h, lang) for h in hypotheses]
+    refs = [fairseq_normalize(r, lang) for r in references]
+    score = BLEU(tokenize="none", smooth_method="none", force=True).corpus_score(hyps, [refs])
+    return float(score.score), FAIRSEQ_SIGNATURE.format(version=version("sacremoses"))
+
+
+def corpus_scores(
+    hypotheses: Sequence[str], references: Sequence[str], *, fairseq_lang: str | None = None
+) -> dict[str, Any]:
+    """Corpus-level scores with sacreBLEU signatures (detokenized text in, ADR-006).
+
+    With ``fairseq_lang`` (the target language), also the fairseq-style tokenized
+    lowercased BLEU (``bleu_fairseq``, ADR-023 protocol B).
+    """
     _check(hypotheses, references)
     hyps, refs = list(hypotheses), [list(references)]
     bleu_metric = BLEU()
@@ -45,7 +89,7 @@ def corpus_scores(hypotheses: Sequence[str], references: Sequence[str]) -> dict[
     bleu_lower = lower_metric.corpus_score(hyps, refs)
     chrf_metric = CHRF()
     chrf = chrf_metric.corpus_score(hyps, refs)
-    return {
+    result: dict[str, Any] = {
         "bleu": round(bleu.score, 2),
         "bleu_signature": str(bleu_metric.get_signature()),
         "bleu_precisions": [round(p, 1) for p in bleu.precisions],
@@ -58,6 +102,11 @@ def corpus_scores(hypotheses: Sequence[str], references: Sequence[str]) -> dict[
         "exact_match": round(exact_match(hyps, list(references)), 4),
         "sentences": len(hyps),
     }
+    if fairseq_lang is not None:
+        score, signature = fairseq_bleu(hyps, list(references), fairseq_lang)
+        result["bleu_fairseq"] = round(score, 2)
+        result["bleu_fairseq_signature"] = signature
+    return result
 
 
 def bleu_by_length(

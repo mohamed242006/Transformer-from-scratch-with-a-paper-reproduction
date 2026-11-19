@@ -1,0 +1,14 @@
+# IWSLT14 baseline (ADR-021, ADR-023): 2-layer BiLSTM encoder, 2-layer LSTM decoder,
+# global "general" attention (Luong et al., 2015; no input feeding). 36,606,112
+# parameters with the 10k joint vocabulary (-0.16% vs transformer_iwslt's 36,663,296).
+name: bilstm_luong_iwslt
+architecture: rnn
+cell: lstm
+attention: luong
+embedding_dim: 512
+hidden_size: 720
+num_layers: 2
+bidirectional_encoder: true
+dropout: 0.3
+tie_weights: true
+max_positions: 1024

@@ -261,3 +261,72 @@ Week 6 exit criterion met: first real BLEU. The length ratio of 0.963 means slig
 Statistics: two-level (sentences × seeds) paired bootstrap with Holm correction, plus seed permutation tests. The roadmap changed: IWSLT14 moves to Week 9 (ADR-023, planned).
 
 **Next action:** run `notebooks/kaggle_study.ipynb` with `aiayn-runs` attached until `STUDY.md` reports *complete*, then turn it into `docs/results.md`.
+
+---
+
+## 2026-11-18 · Week 8 closed: multi-seed study results
+
+`configs/study/week8.yaml`: 118 runs, all completed, none failed. The full write-up is in **[results.md](results.md)**; `STUDY.json` lives in `aiayn-runs/multi30k_tiny_s1/`.
+
+**Key numbers** (Multi30k test 2016, sacreBLEU):
+
+| | Transformer | BiGRU + Bahdanau | BiLSTM + Luong | LSTM, no attention |
+|---|---|---|---|---|
+| Defaults, 5 seeds | **36.71 ± 0.20** | 33.97 ± 0.15 (−2.74*) | 32.46 ± 0.51 (−4.25*) | 12.60 ± 0.26 (−24.1*) |
+| LR ×2, 3 seeds | **37.95** | 36.32 | 36.16 | 17.73 |
+| "Tuned" (valid NLL), 5 seeds | 36.68 (dropout 0.2) | 36.13 (−0.55, n.s.) | 36.45 (−0.23, n.s.) | 17.60 (−19.1*) |
+
+\* Holm-adjusted two-level bootstrap p ≈ 0.003.
+
+**Conclusions:**
+1. The Transformer leads significantly under the protocol defaults.
+2. At a learning rate that suits every model, the lead shrinks to about 1.6–1.8 BLEU (untested).
+3. The "tuned" non-significance comes from a 0.0002-nat NLL tie in the Transformer's selection, so it is not evidence of parity.
+4. Attention is decisive: −19 to −24 BLEU without it.
+5. Learning rate dominates and its optimum lies at the grid edge for every model.
+6. Decoding tuning changes test BLEU by ≤ 0.5 and doesn't transfer reliably from validation to test.
+7. A wide checkpoint-averaging window hurts the RNNs.
+8. Ablations: dropout −8.2; 1 layer −2.2; Pre-LN −1.1; untied −1.2; heads and label smoothing not significant.
+9. layers6 (21.7) is an optimization failure under the 3-layer schedule.
+10. learned_pe and no_embed_scale are confounded with initialization scale.
+
+**Corrections made:** ADR-022's 3-vs-5 permutation floor is 1/56 ≈ 0.018, not 0.036.
+
+**Adopted for Week 9 (ADR-023):**
+- selection by validation BLEU;
+- grid-edge flags;
+- per-model checkpoint selection;
+- outlier-seed flags;
+- a training-health table;
+- incremental decoding;
+- a 6+6 Post-LN pilot gate.
+
+---
+
+## 2026-11-19 · Week 9 Phase 0: IWSLT'14 preparation (no GPU)
+
+**Data** (ADR-023):
+- **Source:** fairseq's `de-en.tgz`, SHA-256 `2c0e4d19…f275`, splits built with the `prepare-iwslt14.sh` procedure on raw cased text.
+- **Counts:** test **6,750**, identical to fairseq. Train/valid 160,215 / 7,282 vs fairseq's 160,239 / 7,283: 25 pairs, attributed to `sacremoses` vs `tokenizer.perl` near the cleaning thresholds. Counts and output hashes are pinned.
+- **Tokenizer:** 10k BPE, fingerprint `b0c6c22a…1989`, deterministic (retrained twice).
+
+**Metrics:** `bleu_fairseq` (Moses-tokenized, lowercased, `tok=none`, `smooth=none`) alongside sacreBLEU for every translation evaluation.
+
+**Decoding:** incremental for all models. Identical hypotheses to prefix decoding (tested); 5.1× (Transformer) and 9.5× (Bahdanau) faster at 40 tokens on CPU.
+
+**Study rules:**
+- selection by validation BLEU with NLL tie-break;
+- per-model checkpoint choice;
+- per-family variant grids;
+- grid-edge flags, training-health table, outlier seeds.
+
+Week 8's config pins its old rules.
+
+**Pilot prepared** (`configs/study/week9_pilot.yaml`):
+- 10 runs of 6k updates: Transformer at LR {5e-4, 7e-4, 1e-3} plus a Pre-LN arm; GRU + Bahdanau and BiLSTM + Luong at {7e-4, 1.4e-3, 2.8e-3}.
+- RNNs resized to 36.57M / 36.61M parameters (vs 36.66M).
+- Gate G1–G4 in ADR-023 §8.
+
+**Local smoke test:** the real pipeline (data, pinned tokenizer, training) ran end to end on CPU with a shrunken model.
+
+**Not run:** any Kaggle job (awaiting approval for Phase 1).

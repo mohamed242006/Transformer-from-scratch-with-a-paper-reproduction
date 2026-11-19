@@ -31,7 +31,7 @@ from aiayn.models.base import EncoderDecoder
 from aiayn.models.baselines.attention import BahdanauAttention, LuongAttention
 from aiayn.models.baselines.config import RNNConfig
 
-__all__ = ["RNNMemory", "RNNSeq2Seq", "build_rnn_seq2seq"]
+__all__ = ["RNNDecoderState", "RNNMemory", "RNNSeq2Seq", "build_rnn_seq2seq"]
 
 State = tuple[torch.Tensor, ...]  # (h,) for GRU, (h, c) for LSTM; each [L, B, H]
 
@@ -56,6 +56,15 @@ class RNNMemory:
             None if self.keys is None else self.keys.repeat_interleave(repeats, dim=0),
             tuple(s.repeat_interleave(repeats, dim=1) for s in self.state),
         )
+
+
+@dataclass
+class RNNDecoderState:
+    """Incremental decoding: recurrent state after the tokens fed so far."""
+
+    memory: RNNMemory
+    src_mask: torch.Tensor  # [B, S]
+    rnn: State
 
 
 class RNNSeq2Seq(EncoderDecoder):
@@ -221,20 +230,64 @@ class RNNSeq2Seq(EncoderDecoder):
         self, y: torch.Tensor, memory: RNNMemory, src_mask: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Sequential: the query at step t is the previous top-layer state s_{t-1}."""
-        assert self.attention is not None and memory.keys is not None
         state = memory.state
-        outputs, contexts, weights = [], [], []
+        features, weights = [], []
         for t in range(y.shape[1]):
-            query = state[0][-1].unsqueeze(1)  # [B, 1, H]
-            context, w = self.attention(query, memory.keys, memory.values, src_mask)
-            step_input = torch.cat([y[:, t : t + 1], context.to(y.dtype)], dim=-1)
-            out, state = self._run(self.decoder, step_input, state)
-            outputs.append(out)
-            contexts.append(context.to(out.dtype))
+            f, w, state = self._bahdanau_step(y[:, t : t + 1], memory, src_mask, state)
+            features.append(f)
             weights.append(w)
-        o, c = torch.cat(outputs, dim=1), torch.cat(contexts, dim=1)
-        features = torch.cat([o, c, y.to(o.dtype)], dim=-1)
-        return features, torch.cat(weights, dim=1)
+        return torch.cat(features, dim=1), torch.cat(weights, dim=1)
+
+    def _bahdanau_step(
+        self, y_t: torch.Tensor, memory: RNNMemory, src_mask: torch.Tensor, state: State
+    ) -> tuple[torch.Tensor, torch.Tensor, State]:
+        """One target position ``y_t [B, 1, E]`` -> ``(features [B, 1, F], weights, state)``."""
+        assert self.attention is not None and memory.keys is not None
+        query = state[0][-1].unsqueeze(1)  # s_{t-1}, top layer: [B, 1, H]
+        context, w = self.attention(query, memory.keys, memory.values, src_mask)
+        step_input = torch.cat([y_t, context.to(y_t.dtype)], dim=-1)
+        out, state = self._run(self.decoder, step_input, state)
+        features = torch.cat([out, context.to(out.dtype), y_t.to(out.dtype)], dim=-1)
+        return features, w, state
+
+    # ------------------------------------------------------------------ #
+    # Incremental decoding (ADR-023 §6)
+    # ------------------------------------------------------------------ #
+    supports_incremental = True
+
+    def init_state(self, memory: RNNMemory, src_mask: torch.Tensor) -> RNNDecoderState:
+        return RNNDecoderState(memory, src_mask, memory.state)
+
+    def decode_step(
+        self, tokens: torch.Tensor, state: RNNDecoderState
+    ) -> tuple[torch.Tensor, RNNDecoderState]:
+        """Newest token per row ``tokens [N]`` -> readout ``[N, E]`` at that position."""
+        y = self.dropout(self.tgt_embedding(tokens[:, None]))  # [N, 1, E]
+        if self.config.attention == "bahdanau":
+            features, _, state.rnn = self._bahdanau_step(y, state.memory, state.src_mask, state.rnn)
+        else:
+            out, state.rnn = self._run(self.decoder, y, state.rnn)
+            if self.attention is None:
+                features = out
+            else:
+                assert state.memory.keys is not None
+                context, _ = self.attention(
+                    out, state.memory.keys, state.memory.values, state.src_mask
+                )
+                features = torch.cat([context.to(out.dtype), out], dim=-1)
+        hidden = self.dropout(torch.tanh(self.readout(features)))
+        return hidden[:, 0], state
+
+    def reorder_state(self, state: RNNDecoderState, rows: torch.Tensor) -> RNNDecoderState:
+        m = state.memory
+        state.memory = RNNMemory(
+            m.values[rows],
+            None if m.keys is None else m.keys[rows],
+            tuple(s[:, rows] for s in m.state),
+        )
+        state.src_mask = state.src_mask[rows]
+        state.rnn = tuple(s[:, rows].contiguous() for s in state.rnn)
+        return state
 
     def generator(self, hidden: torch.Tensor) -> torch.Tensor:
         """``hidden [B,T,E] -> logits [B,T,V]`` = ``r Eᵀ`` (no bias)."""

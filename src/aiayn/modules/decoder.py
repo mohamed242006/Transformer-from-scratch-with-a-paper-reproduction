@@ -6,6 +6,8 @@ stack over embedded target inputs, attending to the encoder memory.
 
 from __future__ import annotations
 
+from typing import cast
+
 import torch
 from torch import nn
 
@@ -15,7 +17,26 @@ from aiayn.modules.layernorm import LayerNorm
 from aiayn.modules.multihead import MultiHeadAttention
 from aiayn.modules.sublayer import NormPosition, SublayerConnection
 
-__all__ = ["Decoder", "DecoderLayer"]
+__all__ = ["Decoder", "DecoderLayer", "LayerCache"]
+
+
+class LayerCache:
+    """Incremental-decoding state of one decoder layer (ADR-023 §6).
+
+    ``self_k``/``self_v``: keys/values of every target position so far ``[B, h, t, d_h]``.
+    ``cross_k``/``cross_v``: projected encoder memory ``[B, h, S, d_h]`` (computed once).
+    """
+
+    def __init__(self, cross_k: torch.Tensor, cross_v: torch.Tensor) -> None:
+        self.cross_k, self.cross_v = cross_k, cross_v
+        self.self_k: torch.Tensor | None = None
+        self.self_v: torch.Tensor | None = None
+
+    def reorder(self, rows: torch.Tensor) -> None:
+        """Keep batch rows ``rows`` (beam search reselection), in place."""
+        self.cross_k, self.cross_v = self.cross_k[rows], self.cross_v[rows]
+        if self.self_k is not None and self.self_v is not None:
+            self.self_k, self.self_v = self.self_k[rows], self.self_v[rows]
 
 
 class DecoderLayer(nn.Module):
@@ -84,6 +105,36 @@ class DecoderLayer(nn.Module):
         x = self.ffn_block(x, self.ffn)
         return x, self_weights[0], cross_weights[0]
 
+    def start(self, memory: torch.Tensor) -> LayerCache:
+        return LayerCache(*self.cross_attn.project_kv(memory, memory))
+
+    def step(self, x: torch.Tensor, cache: LayerCache, memory_mask: torch.Tensor) -> torch.Tensor:
+        """One new position ``x [B, 1, d]`` given ``cache`` (updated in place).
+
+        Same sub-layer blocks as ``forward``; the new query attends to all cached
+        positions, which is exactly the causal mask's row for this position.
+        """
+
+        def self_attention(h: torch.Tensor) -> torch.Tensor:
+            k, v = self.self_attn.project_kv(h, h)
+            if cache.self_k is not None and cache.self_v is not None:
+                k = torch.cat([cache.self_k, k], dim=2)
+                v = torch.cat([cache.self_v, v], dim=2)
+            cache.self_k, cache.self_v = k, v
+            out: torch.Tensor = self.self_attn.attend(h, k, v, None)[0]
+            return out
+
+        def cross_attention(h: torch.Tensor) -> torch.Tensor:
+            out: torch.Tensor = self.cross_attn.attend(
+                h, cache.cross_k, cache.cross_v, memory_mask
+            )[0]
+            return out
+
+        x = self.self_attn_block(x, self_attention)
+        x = self.cross_attn_block(x, cross_attention)
+        out: torch.Tensor = self.ffn_block(x, self.ffn)
+        return out
+
 
 class Decoder(nn.Module):
     """``N`` independently initialized decoder layers (+ final LayerNorm when Pre-LN).
@@ -151,3 +202,17 @@ class Decoder(nn.Module):
         if self.final_norm is not None:
             x = self.final_norm(x)
         return x, tuple(self_maps), tuple(cross_maps)
+
+    def start(self, memory: torch.Tensor) -> list[LayerCache]:
+        """Per-layer caches with the memory projected once (incremental decoding)."""
+        return [cast(DecoderLayer, layer).start(memory) for layer in self.layers]
+
+    def step(
+        self, x: torch.Tensor, caches: list[LayerCache], memory_mask: torch.Tensor
+    ) -> torch.Tensor:
+        """``x [B, 1, d]`` (embedded new position) -> ``hidden [B, 1, d]``."""
+        for layer, cache in zip(self.layers, caches, strict=True):
+            x = cast(DecoderLayer, layer).step(x, cache, memory_mask)
+        if self.final_norm is not None:
+            x = self.final_norm(x)
+        return x

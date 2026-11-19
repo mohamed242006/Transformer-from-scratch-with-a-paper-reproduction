@@ -21,6 +21,7 @@ import yaml
 T = TypeVar("T")
 
 __all__ = [
+    "OMIT_IF_DEFAULT",
     "ConfigError",
     "apply_overrides",
     "config_to_dict",
@@ -32,6 +33,13 @@ __all__ = [
 
 class ConfigError(ValueError):
     """A configuration file, mapping or override is invalid."""
+
+
+#: Field metadata for schema evolution (ADR-023): a field added after configs were
+#: already used is left out of ``config_to_dict`` while it holds its default, so existing
+#: configs serialize - and hash - exactly as before.
+#: Usage: ``field(default=None, metadata=OMIT_IF_DEFAULT)``.
+OMIT_IF_DEFAULT: Mapping[str, bool] = {"omit_if_default": True}
 
 
 def load_yaml(path: str | Path) -> dict[str, Any]:
@@ -123,7 +131,7 @@ def config_to_dict(config: Any) -> dict[str, Any]:
     """Serialize a dataclass config to YAML-friendly builtins (tuples become lists)."""
     if not (dataclasses.is_dataclass(config) and not isinstance(config, type)):
         raise TypeError(f"expected a dataclass instance, got {type(config).__name__}")
-    result = _to_builtin(dataclasses.asdict(config))
+    result = _to_builtin(config)
     assert isinstance(result, dict)
     return result
 
@@ -141,7 +149,23 @@ def _join(path: str, name: str | int) -> str:
     return f"{path}.{name}" if path else name
 
 
+def _field_default(f: dataclasses.Field[Any]) -> Any:
+    if f.default is not dataclasses.MISSING:
+        return f.default
+    if f.default_factory is not dataclasses.MISSING:
+        return f.default_factory()
+    return dataclasses.MISSING
+
+
 def _to_builtin(value: Any) -> Any:
+    if dataclasses.is_dataclass(value) and not isinstance(value, type):
+        out = {}
+        for f in dataclasses.fields(value):
+            item = getattr(value, f.name)
+            if f.metadata.get("omit_if_default") and item == _field_default(f):
+                continue
+            out[f.name] = _to_builtin(copy.deepcopy(item))
+        return out
     if isinstance(value, dict):
         return {k: _to_builtin(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):

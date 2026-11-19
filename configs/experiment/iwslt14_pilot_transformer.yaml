@@ -1,0 +1,5 @@
+# Week 9 Phase 1 pilot (ADR-023 §8): 6,000 updates; same data, decoding and clipping rules as Phase 2.
+name: iwslt14_pilot_transformer
+data: iwslt14
+model: transformer_iwslt
+train: iwslt_pilot

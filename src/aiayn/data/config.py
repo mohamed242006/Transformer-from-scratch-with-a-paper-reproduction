@@ -8,10 +8,11 @@ from pathlib import Path
 from typing import Literal
 
 from aiayn.data.special_tokens import BOS_ID, EOS_ID, PAD_ID, UNK_ID
-from aiayn.utils.config import load_config
+from aiayn.utils.config import OMIT_IF_DEFAULT, load_config
 
 __all__ = [
     "SPLITS",
+    "ArchiveSource",
     "BatchingConfig",
     "CopyTaskConfig",
     "DataConfig",
@@ -97,6 +98,31 @@ class DownloadSpec:
 
 
 @dataclass(frozen=True)
+class ArchiveSource:
+    """One pinned archive turned into all splits by a named recipe (ADR-023).
+
+    ``iwslt14_fairseq``: the IWSLT'14 DE-EN TED archive, split exactly as fairseq's
+    ``prepare-iwslt14.sh`` (train/valid membership, test concatenation), keeping the raw
+    cased text. ``*_lines`` pin the expected sentence counts (0 = unchecked).
+    """
+
+    url: str
+    sha256: str
+    recipe: Literal["iwslt14_fairseq"]
+    train_lines: int = 0
+    valid_lines: int = 0
+    test_lines: int = 0
+
+    def __post_init__(self) -> None:
+        if not _SHA256.match(self.sha256):
+            raise ValueError(f"sha256 must be 64 lowercase hex characters: {self.sha256!r}")
+        if not self.url.startswith(("https://", "file://")):
+            raise ValueError(f"only https:// and file:// URLs are allowed: {self.url!r}")
+        if min(self.train_lines, self.valid_lines, self.test_lines) < 0:
+            raise ValueError("expected line counts must be >= 0")
+
+
+@dataclass(frozen=True)
 class FilterConfig:
     """Length filtering, applied to tensor lengths S and T (ADR-009)."""
 
@@ -146,10 +172,13 @@ class TranslationConfig:
 
     src_lang: str
     tgt_lang: str
-    downloads: tuple[DownloadSpec, ...]
     filter: FilterConfig
     tokenizer: TokenizerConfig
+    downloads: tuple[DownloadSpec, ...] = ()
     root: str = "data"
+    #: Alternative to ``downloads`` (ADR-023); omitted from serialization when unset so
+    #: existing configs keep their hashes.
+    archive: ArchiveSource | None = field(default=None, metadata=OMIT_IF_DEFAULT)
 
     def __post_init__(self) -> None:
         for lang in (self.src_lang, self.tgt_lang):
@@ -157,6 +186,15 @@ class TranslationConfig:
                 raise ValueError(f"language codes must be 2-3 lowercase letters: {lang!r}")
         if self.src_lang == self.tgt_lang:
             raise ValueError("src_lang and tgt_lang must differ")
+        if self.archive is not None:
+            if self.downloads:
+                raise ValueError("give either 'downloads' or 'archive', not both")
+            if self.archive.recipe == "iwslt14_fairseq" and {self.src_lang, self.tgt_lang} != {
+                "de",
+                "en",
+            }:
+                raise ValueError("recipe iwslt14_fairseq provides de and en only")
+            return
         seen: set[tuple[str, str]] = set()
         for spec in self.downloads:
             if spec.lang not in (self.src_lang, self.tgt_lang):

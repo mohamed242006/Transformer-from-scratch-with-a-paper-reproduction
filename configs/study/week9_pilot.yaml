@@ -1,0 +1,39 @@
+# Week 9 Phase 1: IWSLT14 pilot (ADR-023 §8). 10 short runs (6,000 updates, seed 1):
+#   - go/no-go gate for the 6+6 Post-LN Transformer (Week 8's layers6 failure), against a
+#     Pre-LN arm;
+#   - learning-rate selection per model family on VALIDATION BLEU, with a grid that
+#     brackets the default from both sides (Week 8: every optimum sat at the grid edge).
+# Outputs: STUDY.md sections 4 (sensitivity), 7 (Pre-LN arm), 9 (training health).
+# Gate criteria are in ADR-023 §8; Phase 2 configs are set from this study's selections.
+name: week9_pilot
+reference: transformer
+models:
+  transformer: configs/experiment/iwslt14_pilot_transformer.yaml
+  gru_bahdanau: configs/experiment/iwslt14_pilot_gru_bahdanau.yaml
+  bilstm_luong: configs/experiment/iwslt14_pilot_bilstm_luong.yaml
+main_seeds: [1]
+bootstrap_samples: 1000
+default_beam: 4
+default_alpha: 0.6
+training_selection: valid_bleu
+select_checkpoint: false   # 6k-update pilots: the averaged/best choice is made in Phase 2
+
+decoding:                  # no decoding study in the pilot: protocol decoding only
+  split: valid
+  seeds: [1]
+  beams: [4]
+  length_penalties: [0.6]
+
+sensitivity:
+  seeds: [1]
+  variants:
+    lr0.0005: {overrides: ["train.schedule.peak_lr=5.0e-4"], models: [transformer]}
+    lr0.001: {overrides: ["train.schedule.peak_lr=1.0e-3"], models: [transformer]}
+    lr0.0014: {overrides: ["train.schedule.peak_lr=1.4e-3"], models: [gru_bahdanau, bilstm_luong]}
+    lr0.0028: {overrides: ["train.schedule.peak_lr=2.8e-3"], models: [gru_bahdanau, bilstm_luong]}
+
+ablations:
+  models: [transformer]
+  seeds: [1]
+  variants:
+    pre_ln: ["model.norm_position=pre"]   # the gate's comparison arm (ADR-003, ADR-023 §8)

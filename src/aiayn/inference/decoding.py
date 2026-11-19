@@ -3,9 +3,10 @@
 Both decoders:
 
 * work with any ``EncoderDecoder`` (Transformer or RNN baseline; ADR-021);
-* run the encoder once per batch and recompute the decoder over the prefix at each step
-  (no KV cache or carried RNN state yet: a planned extension; exact for every model
-  because decoders are causal; cost is fine at sentence length);
+* run the encoder once per batch; the decoder runs **incrementally** (cached keys/values
+  for the Transformer, carried state for the RNNs; ADR-023 §6) when the model supports
+  it, else over the whole prefix at each step. Both are exact because decoders are
+  causal; ``incremental=False`` forces the prefix path (used to test equivalence);
 * never generate PAD or BOS;
 * stop each sentence at EOS or at ``max_len = max_len_a · |x| + max_len_b`` generated tokens
   (paper: input length + 50, so a = 1, b = 50), where EOS is forced on the last step;
@@ -90,6 +91,25 @@ def _step_log_probs(
     with ctx:
         hidden, _, _ = model.decode(tokens, memory, src_mask)
         logits = model.generator(hidden[:, -1])
+    return _log_probs(logits)
+
+
+def _incremental_log_probs(
+    model: EncoderDecoder, last: torch.Tensor, state: Any, autocast_dtype: torch.dtype | None
+) -> torch.Tensor:
+    """Feed the newest token of each row; same output as ``_step_log_probs``."""
+    ctx: Any = (
+        torch.autocast(device_type=last.device.type, dtype=autocast_dtype)
+        if autocast_dtype is not None
+        else contextlib.nullcontext()
+    )
+    with ctx:
+        hidden, _ = model.decode_step(last, state)
+        logits = model.generator(hidden)
+    return _log_probs(logits)
+
+
+def _log_probs(logits: torch.Tensor) -> torch.Tensor:
     compute = torch.promote_types(logits.dtype, torch.float32)
     lprobs = F.log_softmax(logits.to(compute), dim=-1)
     lprobs[:, PAD_ID] = -math.inf
@@ -125,6 +145,7 @@ def greedy_decode(
     config: DecodeConfig | None = None,
     *,
     autocast_dtype: torch.dtype | None = None,
+    incremental: bool | None = None,
 ) -> list[Hypothesis]:
     """Batched greedy decoding. ``src [B, S]`` -> one hypothesis per sentence.
 
@@ -140,8 +161,13 @@ def greedy_decode(
     tokens = torch.full((batch, 1), BOS_ID, dtype=torch.long, device=src.device)
     scores = torch.zeros(batch, dtype=torch.float64, device=src.device)
     finished = torch.zeros(batch, dtype=torch.bool, device=src.device)
+    use_cache = model.supports_incremental if incremental is None else incremental
+    state = model.init_state(memory, src_mask) if use_cache else None
     for step in range(1, max(limits) + 1):
-        lprobs = _step_log_probs(model, tokens, memory, src_mask, autocast_dtype)
+        if use_cache:
+            lprobs = _incremental_log_probs(model, tokens[:, -1], state, autocast_dtype)
+        else:
+            lprobs = _step_log_probs(model, tokens, memory, src_mask, autocast_dtype)
         _force_eos(lprobs, limit_t <= step)
         best_lp, best = lprobs.max(dim=-1)
         best = torch.where(finished, torch.full_like(best, PAD_ID), best)
@@ -166,6 +192,7 @@ def beam_search(
     config: DecodeConfig | None = None,
     *,
     autocast_dtype: torch.dtype | None = None,
+    incremental: bool | None = None,
 ) -> list[Hypothesis]:
     """Batched beam search with the GNMT length penalty. ``src [B, S]`` -> best per sentence."""
     config = config or DecodeConfig()
@@ -182,9 +209,14 @@ def beam_search(
     finished: list[list[Hypothesis]] = [[] for _ in range(batch)]
     done = [False] * batch
     row_limits = torch.tensor(limits, device=device).repeat_interleave(k)
+    use_cache = model.supports_incremental if incremental is None else incremental
+    state = model.init_state(memory, src_mask) if use_cache else None
 
     for step in range(1, max(limits) + 1):
-        lprobs = _step_log_probs(model, tokens, memory, src_mask, autocast_dtype).double()
+        if use_cache:
+            lprobs = _incremental_log_probs(model, tokens[:, -1], state, autocast_dtype).double()
+        else:
+            lprobs = _step_log_probs(model, tokens, memory, src_mask, autocast_dtype).double()
         _force_eos(lprobs, row_limits <= step)
         candidates = (scores.view(-1, 1) + lprobs).view(batch, k * vocab)
         top_scores, top_index = candidates.topk(2 * k, dim=1)  # [B, 2k]
@@ -234,6 +266,8 @@ def beam_search(
             break
         tokens = torch.cat([tokens[next_rows], next_tokens.unsqueeze(1)], dim=1)
         scores = next_scores
+        if use_cache:
+            state = model.reorder_state(state, next_rows)
 
     best: list[Hypothesis] = []
     for b in range(batch):

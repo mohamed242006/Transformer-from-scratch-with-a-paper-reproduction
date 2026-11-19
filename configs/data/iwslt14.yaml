@@ -1,0 +1,48 @@
+# IWSLT'14 DE->EN (TED talks), the Week 9 benchmark (ADR-002, ADR-023).
+# Source: fairseq's public copy of the WIT3 2014-01 release (de-en.tgz, 19,982,877 bytes,
+# last modified 2021-01-07), checksum pinned 2026-11-18. Splits follow fairseq's
+# prepare-iwslt14.sh (aiayn/data/iwslt.py) but keep raw, cased, untokenized text
+# (protocol A). Test = dev2010 + TEDX.dev2012 + tst2010 + tst2011 + tst2012 = 6,750
+# sentences, identical to fairseq. Train/valid: 160,215 / 7,282 with sacremoses 0.2.0
+# (fairseq with Moses' tokenizer.perl: 160,239 / 7,283; see ADR-023 §3).
+name: iwslt14
+task: translation
+seed: 1234
+
+translation:
+  src_lang: de
+  tgt_lang: en
+  root: data
+  archive:
+    url: "https://dl.fbaipublicfiles.com/fairseq/data/iwslt14/de-en.tgz"
+    sha256: 2c0e4d19e99384ffc7a395d6639297f98fd86a424b02a2ac1f52cd1ff85cf275
+    recipe: iwslt14_fairseq
+    train_lines: 160215
+    valid_lines: 7282
+    test_lines: 6750
+
+  filter:
+    max_len: 256        # tensor lengths (subwords + EOS); fairseq already capped at 175 words
+    min_len: 1
+    max_len_ratio: null # fairseq's word-ratio cleaning (1.5) is part of the recipe
+
+  tokenizer:            # ADR-005; joint 10k vocabulary (ADR-023 §4)
+    model_type: bpe
+    vocab_size: 10000
+    character_coverage: 1.0
+    normalization_rule_name: nmt_nfkc
+    input_sentence_size: 0
+    num_threads: 1
+    hard_vocab_limit: true
+    pad_id: 0
+    unk_id: 1
+    bos_id: 2
+    eos_id: 3
+
+batching:
+  max_tokens: 8192      # ~490 updates/epoch; 30k updates ~ 61 epochs (iwslt_t4)
+  max_sentences: null
+  pool_size: 8192
+  eval_max_tokens: 16384
+  pad_to_multiple_of: 1
+  num_workers: 0

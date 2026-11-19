@@ -9,6 +9,8 @@ Sections:
 6. Checkpoint averaging and beam search (paired, same runs).
 7. Transformer ablations (paper Table 3 style).
 8. Statistical notes and fairness checks.
+9. Training health (best-update position, final train NLL, gradient spikes) and
+   outlier seeds (ADR-023).
 
 Primary test: two-level paired bootstrap (sentences × seeds) of the mean-over-seeds BLEU
 difference, Holm-adjusted within each table. Supplementary: exact seed permutation test.
@@ -41,14 +43,18 @@ from aiayn.study.plan import (
     DEFAULT,
     EvalSpec,
     all_run_names,
+    decoding_edges,
     default_test,
+    default_valid,
     grid_evals,
     is_alias,
     main_run,
     planned_runs,
+    select_checkpoint,
     select_decoding,
     select_training,
     tasks,
+    training_edges,
     variant_run,
 )
 from aiayn.study.storage import RunState
@@ -113,6 +119,36 @@ def _check(ok: bool) -> str:
     return "PASS" if ok else "**FAIL**"
 
 
+def _edges(edges: Sequence[str]) -> str:
+    return f" ⚠ {'; '.join(edges)}" if edges else ""
+
+
+OUTLIER_BLEU = 3.0  # a seed this far below its configuration's median is flagged
+EARLY_BEST = 0.6  # best validation before this fraction of training
+UNDERFIT_NLL = 0.3  # final train NLL this far above the model default's
+
+
+def training_health(state: RunState) -> dict[str, float] | None:
+    """Final train NLL, max gradient norm and best-update position from the run files."""
+    path = state.path / "metrics.jsonl"
+    if not path.is_file():
+        return None
+    records = [
+        json.loads(line)
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line and '"split": "train"' in line
+    ]
+    if not records:
+        return None
+    final = int(records[-1].get("step", 0)) or 1
+    best = state.metadata.get("best_update")
+    return {
+        "final_train_nll": float(records[-1]["nll"]),
+        "max_grad_norm": max(float(r.get("grad_norm", 0.0)) for r in records),
+        "best_fraction": float(best) / final if best else float("nan"),
+    }
+
+
 class Analyzer:
     def __init__(
         self, study: StudyConfig, states: Mapping[str, RunState], references: Sequence[str]
@@ -170,12 +206,18 @@ class Analyzer:
         adjusted = holm([t["p_bootstrap"] if t else None for t in tests])
         lines = [
             "| Model | Params | Seeds | **BLEU** mean ± std | 95% CI (seeds) | min–max | chrF "
-            "| Len ratio | Valid NLL | ΔBLEU | 95% CI (Δ) | p | p (Holm) | p (seed perm.) |",
-            "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
+            "| tok-lc BLEU | Len ratio | Valid NLL | ΔBLEU | 95% CI (Δ) | p | p (Holm) "
+            "| p (seed perm.) |",
+            "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
         ]
         for system, test, p_adj, ref in zip(systems, tests, adjusted, is_ref, strict=True):
             bleu = system.values("bleu")
             params = system.scored[0].parameters if system.scored else None
+            fairseq = [
+                float(r.evals[system.tag]["bleu_fairseq"])
+                for r in system.scored
+                if "bleu_fairseq" in r.evals[system.tag]
+            ]
             entry = {
                 "label": system.label,
                 "tag": system.tag,
@@ -183,6 +225,7 @@ class Analyzer:
                 "runs": [r.path.name for r in system.scored],
                 "bleu": bleu,
                 "chrf": system.values("chrf"),
+                "bleu_fairseq": fairseq,
                 "length_ratio": system.values("length_ratio"),
                 "valid_nll": system.nlls(),
                 "test": test,
@@ -204,7 +247,8 @@ class Analyzer:
             rows.append(
                 f"| {system.label} | {_f(params, ',') if params else '-'} | {len(bleu)} | "
                 f"**{_ms(bleu)}** | {seed_ci} | {span} | {_ms(system.values('chrf'))} | "
-                f"{ratio} | {_ms(system.nlls(), 3)} | {delta} | {ci} | {p} | {ph} | {pp} |"
+                f"{_ms(fairseq)} | {ratio} | {_ms(system.nlls(), 3)} | {delta} | {ci} | {p} | "
+                f"{ph} | {pp} |"
             )
         self.data[key] = entries
         return lines + rows
@@ -231,18 +275,27 @@ class Analyzer:
         if len(selected) < len(self.study.models):
             return [*lines, "_Pending: the decoding grid is not complete for every model._"]
         lines.append(
-            "Each model decodes with its own valid-best (beam, α) (section 5); "
+            "Each model uses its own valid-selected checkpoint and (beam, α) (section 5); "
             "everything else as in section 1."
         )
         lines.append("")
+        for m, spec in selected.items():
+            lines.append(
+                f"- {m}: {spec.checkpoint} checkpoint, {_decode_label(spec)}"
+                + _edges(decoding_edges(self.study, spec))
+            )
+        lines.append("")
         systems = [
             System(
-                f"{m} ({selected[m].tag.split('.')[-1]})", self.main_system(m).runs, selected[m].tag
+                f"{m} ({selected[m].checkpoint}, {selected[m].tag.split('.')[-1]})",
+                self.main_system(m).runs,
+                selected[m].tag,
             )
             for m in self.study.models
         ]
         reference = systems[list(self.study.models).index(self.study.reference)]
         self.data["decoding_selection"] = {m: [s.beam, s.alpha] for m, s in selected.items()}
+        self.data["checkpoint_selection"] = {m: s.checkpoint for m, s in selected.items()}
         return [*lines, *self.comparison_table("decoding_selected", systems, reference)]
 
     def section_tuned(self) -> list[str]:
@@ -250,12 +303,19 @@ class Analyzer:
         choices = {m: select_training(self.study, m, self.states) for m in self.study.models}
         if any(c is None for c in choices.values()):
             return [*lines, "_Pending: the sensitivity grid is not complete for every model._"]
+        rule = (
+            "highest mean validation BLEU (NLL breaks ties)"
+            if self.study.training_selection == "valid_bleu"
+            else "lowest mean best-validation NLL"
+        )
         lines += [
-            "Per model, the sensitivity variant with the lowest mean best-validation NLL "
+            f"Per model, the sensitivity variant with the {rule} "
             f"(seeds {list(self.study.sensitivity.seeds)}), run on all main seeds:",
             "",
         ]
-        lines += [f"- {m}: `{c}`" for m, c in choices.items()]
+        edges = {m: training_edges(self.study, m, str(c)) for m, c in choices.items()}
+        lines += [f"- {m}: `{c}`{_edges(edges[m])}" for m, c in choices.items()]
+        self.data["training_selection_edges"] = edges
         lines.append("")
         systems = [
             self.variant_system(m, str(choices[m]), self.study.main_seeds, f"{m} ({choices[m]})")
@@ -282,8 +342,9 @@ class Analyzer:
                 "",
                 f"**{model}** (selected: `{choice or 'pending'}`)",
                 "",
-                "| Variant | Overrides | Done | Failed | Valid NLL | Test BLEU | Δ vs default |",
-                "|---|---|---|---|---|---|---|",
+                "| Variant | Overrides | Done | Failed | Valid NLL | Valid BLEU | Test BLEU "
+                "| Δ vs default |",
+                "|---|---|---|---|---|---|---|---|",
             ]
             rows: dict[str, Any] = {}
             for name, overrides, system in [
@@ -297,17 +358,22 @@ class Analyzer:
                         else self.variant_system(model, v.name, group.seeds, v.name),
                     )
                     for v in group.variants
+                    if v.applies_to(model)
                 ],
             ]:
                 if system is None:
-                    lines.append(f"| {name} | {overrides} | = default | | | | |")
+                    lines.append(f"| {name} | {overrides} | = default | | | | | |")
                     continue
                 failed = sum(r.failed for r in system.runs)
                 bleu = system.values("bleu")
                 delta = _mean(bleu)
+                valid_tag = default_valid(self.study).tag
+                valid = [
+                    float(r.evals[valid_tag]["bleu"]) for r in system.scored if valid_tag in r.evals
+                ]
                 lines.append(
                     f"| {name} | {overrides} | {len(bleu)}/{len(group.seeds)} | {failed or ''} | "
-                    f"{_ms(system.nlls(), 3)} | {_ms(bleu)} | "
+                    f"{_ms(system.nlls(), 3)} | {_ms(valid)} | {_ms(bleu)} | "
                     f"{_delta(delta, base, name == 'default')} |"
                 )
                 rows[name] = {"bleu": bleu, "valid_nll": system.nlls(), "failed": failed}
@@ -320,14 +386,16 @@ class Analyzer:
         lines = [
             "## 5. Decoding sensitivity",
             "",
-            f"Mean {d.split} BLEU over seeds {list(d.seeds)} (averaged checkpoint). The valid-best "
-            "setting per model is used in section 2; test data never drives the choice.",
+            f"Mean {d.split} BLEU over seeds {list(d.seeds)}, on each model's selected "
+            "checkpoint (best vs averaged, chosen on validation first). The valid-best setting "
+            "is used in section 2; test data never drives a choice.",
         ]
         out: dict[str, Any] = {}
         alphas = d.length_penalties
         for model in self.study.models:
+            checkpoint = select_checkpoint(self.study, model, self.states) or "averaged"
             grid: dict[str, float | None] = {}
-            for spec in grid_evals(self.study):
+            for spec in grid_evals(self.study, checkpoint):
                 values = [
                     float(self.states[n].evals[spec.tag]["bleu"])
                     for n in (main_run(self.study, model, s).name for s in d.seeds)
@@ -335,9 +403,25 @@ class Analyzer:
                 ]
                 grid[spec.tag] = _mean(values)
             choice = select_decoding(self.study, model, self.states)
+            ckpt_means = {
+                name: _mean(
+                    [
+                        float(self.states[n].evals[tag]["bleu"])
+                        for n in (main_run(self.study, model, s).name for s in d.seeds)
+                        if n in self.states and tag in self.states[n].evals
+                    ]
+                )
+                for name, tag in (
+                    ("averaged", default_valid(self.study, "averaged").tag),
+                    ("best", default_valid(self.study, "best").tag),
+                )
+            }
+            edge = _edges(decoding_edges(self.study, choice)) if choice else ""
             lines += [
                 "",
-                f"**{model}** (selected: {_decode_label(choice)})",
+                f"**{model}** (checkpoint: {checkpoint}; valid BLEU averaged "
+                f"{_f(ckpt_means['averaged'])} vs best {_f(ckpt_means['best'])}; "
+                f"selected: {_decode_label(choice)}{edge})",
                 "",
                 "| Beam | " + " | ".join(f"α={a:g}" for a in alphas) + " |",
                 "|---|" + "---|" * len(alphas),
@@ -346,7 +430,7 @@ class Analyzer:
                 cells = []
                 for a in alphas:
                     tag = EvalSpec(
-                        d.split, "averaged", beam, a if beam > 1 else self.study.default_alpha
+                        d.split, checkpoint, beam, a if beam > 1 else self.study.default_alpha
                     ).tag
                     cells.append(_f(grid.get(tag)))
                     if beam == 1:
@@ -356,6 +440,8 @@ class Analyzer:
                     f"| {beam if beam > 1 else '1 (greedy)'} | " + " | ".join(cells) + " |"
                 )
             out[model] = {
+                "checkpoint": checkpoint,
+                "checkpoint_valid_bleu": ckpt_means,
                 "grid": grid,
                 "selected": None if choice is None else [choice.beam, choice.alpha],
             }
@@ -510,10 +596,96 @@ class Analyzer:
             "variants differ only by their listed overrides; seeds by `train.seed`.",
             f"- Tests: two-level paired bootstrap ({self.n} samples; sentences × seeds), p floor "
             f"{format_p(1 / (self.n + 1), self.n)}; Holm-Bonferroni within each table; exact "
-            "seed permutation test as a training-variance-only check (its smallest attainable p "
-            "depends on the number of seeds).",
+            "seed permutation test as a training-variance-only check (smallest attainable p: "
+            "2/252 for 5 vs 5 seeds; 1/56 for 3 vs 5 seeds).",
         ]
         return lines
+
+
+def _configurations(analyzer: Analyzer) -> list[tuple[str, str, System]]:
+    """(model, label, system) for every trained configuration, defaults first."""
+    study = analyzer.study
+    out = [(m, "default", analyzer.main_system(m)) for m in study.models]
+    for group_name, group in (("ablation", study.ablations), ("sensitivity", study.sensitivity)):
+        for model in group.models:
+            for v in group.variants:
+                if not v.applies_to(model) or is_alias(study, model, v):
+                    continue
+                names = [variant_run(study, model, "sensitivity", v, s).name for s in group.seeds]
+                if group_name == "sensitivity":
+                    names += [
+                        variant_run(study, model, "tuned", v, s).name
+                        for s in study.main_seeds
+                        if s not in group.seeds
+                    ]
+                label = f"{v.name} ({group_name})"
+                out.append(
+                    (model, label, System(label, analyzer.runs(names), default_test(study).tag))
+                )
+    return out
+
+
+def section_health(analyzer: Analyzer) -> list[str]:
+    lines = [
+        "## 9. Training health and outlier seeds",
+        "",
+        f"Means over seeds. Flags: best validation before {EARLY_BEST:.0%} of training "
+        f"(over-fitting or instability); final train NLL more than {UNDERFIT_NLL} above the "
+        "model default's (under-fitting or optimization failure).",
+        "",
+        "| Model | Configuration | Seeds | Best at | Final train NLL | Best valid NLL "
+        "| Max grad norm | Flags |",
+        "|---|---|---|---|---|---|---|---|",
+    ]
+    rows, outliers = [], []
+    baseline: dict[str, float] = {}
+    for model, label, system in _configurations(analyzer):
+        health = [h for r in system.scored if (h := training_health(r)) is not None]
+        train = [h["final_train_nll"] for h in health]
+        fractions = [h["best_fraction"] for h in health if not math.isnan(h["best_fraction"])]
+        mean_train = _mean(train)
+        if label == "default" and mean_train is not None:
+            baseline[model] = mean_train
+        flags = []
+        if fractions and (_mean(fractions) or 1.0) < EARLY_BEST:
+            flags.append("early best")
+        if (
+            mean_train is not None
+            and model in baseline
+            and label != "default"
+            and mean_train > baseline[model] + UNDERFIT_NLL
+        ):
+            flags.append("under-fitting")
+        rows.append(
+            {"model": model, "configuration": label, "flags": flags, "final_train_nll": train}
+        )
+        lines.append(
+            f"| {model} | {label} | {len(system.scored)} | "
+            f"{_f(_mean(fractions), '.0%') if fractions else '-'} | {_ms(train, 3)} | "
+            f"{_ms(system.nlls(), 3)} | "
+            f"{_f(max(h['max_grad_norm'] for h in health), '.1f') if health else '-'} | "
+            f"{', '.join(flags)} |"
+        )
+        bleu = system.values("bleu")
+        if len(bleu) >= 3:
+            median = sorted(bleu)[len(bleu) // 2]
+            for run, value in zip(system.scored, bleu, strict=True):
+                if value < median - OUTLIER_BLEU:
+                    outliers.append(
+                        {"run": run.path.name, "bleu": value, "median": median, "model": model}
+                    )
+    lines += [
+        "",
+        "**Outlier seeds** (test BLEU more than "
+        f"{OUTLIER_BLEU:g} below their configuration's median; possible silent collapse):",
+        "",
+    ]
+    lines += [f"- `{o['run']}`: {o['bleu']:.2f} vs median {o['median']:.2f}" for o in outliers] or [
+        "- none"
+    ]
+    analyzer.data["health"] = rows
+    analyzer.data["outlier_seeds"] = outliers
+    return lines
 
 
 def build_study_report(
@@ -551,6 +723,7 @@ def build_study_report(
         analyzer.section_free_ablations(),
         analyzer.section_ablations(),
         analyzer.section_notes(),
+        section_health(analyzer),
     ]
     analyzer.data["status"] = {
         "completed": completed,

@@ -92,9 +92,26 @@ class MultiHeadAttention(nn.Module):
         if key.shape[1] != value.shape[1]:
             raise ValueError(f"key/value lengths differ: {key.shape[1]} vs {value.shape[1]}")
 
+        k, v = self.project_kv(key, value)
+        return self.attend(query, k, v, mask)
+
+    def project_kv(
+        self, key: torch.Tensor, value: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Head-split key/value projections ``[B, h, Tk, d_h]`` (cacheable for decoding)."""
+        k = split_heads(self.k_proj(key), self.num_heads)
+        v = split_heads(self.v_proj(value), self.num_heads)
+        return k, v
+
+    def attend(
+        self,
+        query: torch.Tensor,
+        k: torch.Tensor,
+        v: torch.Tensor,
+        mask: torch.Tensor | None = None,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Attention of ``query [B, Tq, d]`` over already projected ``k``/``v``."""
         q = split_heads(self.q_proj(query), self.num_heads)  # [B, h, Tq, d_h]
-        k = split_heads(self.k_proj(key), self.num_heads)  # [B, h, Tk, d_h]
-        v = split_heads(self.v_proj(value), self.num_heads)  # [B, h, Tk, d_h]
         context, weights = scaled_dot_product_attention(
             q, k, v, mask, dropout_p=self.dropout, training=self.training
         )  # [B, h, Tq, d_h], [B, h, Tq, Tk]

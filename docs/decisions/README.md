@@ -27,12 +27,13 @@ An ADR records **one** significant decision: the forces that shaped it, what was
 | [ADR-019](ADR-019-decoding-and-evaluation.md) | Decoding, checkpoint averaging and the evaluation pipeline | Accepted | 2026-11-16 |
 | [ADR-020](ADR-020-kaggle-run-persistence.md) | Preserve Kaggle runs: commit-mode sessions + private runs dataset, auto-resume | Accepted | 2026-11-16 |
 | [ADR-021](ADR-021-rnn-baselines-and-fair-comparison.md) | RNN baselines (LSTM, GRU+Bahdanau, BiLSTM+Luong) and the fair-comparison protocol | Accepted | 2026-11-17 |
-| [ADR-022](ADR-022-multi-seed-study-and-statistics.md) | Multi-seed study, sensitivity, ablations and statistical protocol (Week 8) | Accepted | 2026-11-17 |
+| [ADR-022](ADR-022-multi-seed-study-and-statistics.md) | Multi-seed study, sensitivity, ablations and statistical protocol (Week 8) | Accepted (amended 2026-11-18) | 2026-11-17 |
+| [ADR-023](ADR-023-iwslt14-benchmark.md) | IWSLT'14 benchmark: pinned data, protocols A+B, incremental decoding, study rules, pilot gate | Accepted | 2026-11-19 |
 
 ### Planned ADRs (not yet written)
 | Planned | Topic | Target week |
 |---|---|---|
-| ADR-023 | IWSLT14 source pinning, preprocessing and main benchmark | Week 9+ (to be scheduled) |
+| — | none at the moment | |
 
 ## Lifecycle
 `Proposed` → `Accepted` → (`Deprecated` | `Superseded by ADR-XXX`)

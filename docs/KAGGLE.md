@@ -234,3 +234,17 @@ More seeds: add `("configs/experiment/<exp>.yaml", "<exp>_s2")` entries with `OV
 - `python scripts/analyze_study.py --study configs/study/week8.yaml --work runs --input <downloaded aiayn-runs> --out runs/STUDY.md --prepare-data` rebuilds the report from downloaded runs.
 
 A diverged run (for example at LR ×2) is recorded as `FAILED.json` and reported in the tables. It is never retried, and in the selection it counts as the worst option.
+
+## 12. Week 9: IWSLT'14 (ADR-023)
+**Phase 0** (done, no GPU): pinned data, protocols A + B, incremental decoding, study rules, pilot configs.
+
+**Phase 1** (awaiting approval), in two committed sessions:
+1. **Validation (~15 min).** In `notebooks/kaggle_validate.ipynb`, keep the defaults: `DATA_CONFIG = configs/data/iwslt14.yaml` and the three IWSLT models. It downloads and checks the archive, builds the splits (the counts must match), trains the 10k tokenizer (the fingerprint must match `b0c6c22a…`), and measures T4 memory and throughput for the Transformer and both RNNs (gate G4).
+2. **Pilot (~10 short runs).** In `notebooks/kaggle_study.ipynb`, set `STUDY = "configs/study/week9_pilot.yaml"` (the default). Attach `aiayn-runs` and save with *Save & Run All (Commit)*. Then read `STUDY.md`:
+   - §4: learning-rate choices and any grid-edge flags (gate G3);
+   - §7: the Pre-LN arm (gate G2);
+   - §9: training health (gate G1).
+
+**Phase 2** (after the gate): set `peak_lr` in `configs/experiment/iwslt14_*.yaml` from the pilot, then run the 3-seed benchmark study.
+
+Every evaluation reports sacreBLEU (primary) and `bleu_fairseq` (tokenized lowercased, for literature comparison; ADR-023 §4).

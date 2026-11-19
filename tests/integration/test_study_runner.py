@@ -46,8 +46,11 @@ QUALITY = {"transformer": 0.8, "gru_bahdanau": 0.6}
 NLL = {"default": 2.0, "lr_half": 2.2, "dropout0.3": 1.9}  # dropout0.3 wins for the Transformer
 
 
-def small_study(tmp_path: Path) -> Any:
-    raw = {
+def small_study(tmp_path: Path, **changes: Any) -> Any:
+    """Week 8 rules by default (valid-NLL selection, averaged checkpoint)."""
+    raw: dict[str, Any] = {
+        "training_selection": "valid_nll",
+        "select_checkpoint": False,
         "name": "mini",
         "reference": "transformer",
         "models": {
@@ -70,6 +73,7 @@ def small_study(tmp_path: Path) -> Any:
             "variants": {"heads8": ["model.num_heads=8"]},
         },
     }
+    raw.update(changes)
     path = tmp_path / "mini.yaml"
     path.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
     return load_study(path)
@@ -125,6 +129,10 @@ def fake_eval(run_dir: Path, spec: EvalSpec) -> None:
     quality = QUALITY[model] + (
         0.1 if model == "gru_bahdanau" and spec.alpha == 1.0 and spec.beam > 1 else 0.0
     )
+    if "-lr_half" in run_dir.name:
+        quality += 0.15  # best validation BLEU although its NLL is worse (NLL table above)
+    if model == "gru_bahdanau" and spec.checkpoint == "best":
+        quality += 0.15  # the best checkpoint beats averaging for the GRU
     rng = random.Random(zlib.crc32(f"{run_dir.name}{spec.split}{spec.checkpoint}".encode()))
     hyps = [r if rng.random() < quality else " ".join(r.split()[:2]) for r in REFS]
     score = BLEU().corpus_score(hyps, [REFS])
@@ -300,3 +308,37 @@ def test_incomplete_runs_are_never_slimmed(tmp_path: Path) -> None:
     Trainer.create(make_experiment(max_updates=4, time_budget_minutes=1e-9), run_dir).train()
     with pytest.raises(ValueError, match="completed"):
         slim_run(run_dir, keep_best=True)
+
+
+def test_adr023_rules_select_on_validation_bleu_and_checkpoint(tmp_path: Path) -> None:
+    study = small_study(
+        tmp_path,
+        training_selection="valid_bleu",
+        select_checkpoint=True,
+        sensitivity={
+            "seeds": [1, 2],
+            "variants": {
+                "lr_half": ["train.schedule.peak_lr=3.5e-4"],
+                "dropout0.3": {"overrides": ["model.dropout=0.3"], "models": ["transformer"]},
+            },
+        },
+    )
+    env = StudyEnv(tmp_path / "work")
+    trainer = FakeTrainer()
+    assert run_study(study, env, minutes=1e6, train_fn=trainer, eval_fn=fake_eval).status == (
+        "complete"
+    )
+    states = collect_states(study, env)
+    report, data = build_study_report(study, states, REFS)
+    # Valid BLEU picks lr_half even though valid NLL prefers dropout0.3 (Week 8's rule).
+    assert data["training_selection"]["transformer"] == "lr_half"
+    # Per-model variants: dropout0.3 was never planned for the GRU.
+    assert not any("gru_bahdanau-dropout0.3" in name for name in trainer.calls)
+    # The GRU's best checkpoint wins on validation; its grid and test runs use it.
+    assert data["checkpoint_selection"]["gru_bahdanau"] == "best"
+    assert data["checkpoint_selection"]["transformer"] == "averaged"
+    gru = states[main_run(study, "gru_bahdanau", 3).name]
+    assert any(tag.startswith("test.best.beam4") for tag in gru.evals)
+    assert "valid.best.beam4-a1" in states[main_run(study, "gru_bahdanau", 1).name].evals
+    assert "## 9. Training health and outlier seeds" in report
+    assert "tok-lc BLEU" in report

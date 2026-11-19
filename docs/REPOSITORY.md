@@ -73,9 +73,11 @@ Status markers: **[W1]** created in Week 1 · *(Wn)* populated in that week.
 │       │   ├── base.py, factory.py [W7] EncoderDecoder interface; build_model dispatch
 │       │   └── baselines/          [W7] RNNConfig, RNNSeq2Seq (LSTM/GRU), Bahdanau/Luong attention
 │       ├── data/                   [W2] special_tokens, example (framing), config (schema), tokenizer,
-│       │                                copy_task, datasets, sampler, collate, prepare, loading
+│       │                                copy_task, datasets, sampler, collate, prepare, loading;
+│       │                           [W9] iwslt (IWSLT'14 recipe, fairseq split membership)
 │       ├── training/               [W5] config, experiment, losses, schedule, checkpoint, trainer
-│       ├── inference/              [W6] decoding (greedy, beam), averaging, translator, evaluate, report;
+│       ├── inference/              [W6] decoding (greedy, beam; [W9] incremental), averaging, translator,
+│       │                           evaluate, report;
 │       │                           [W7] comparison (fairness checks, COMPARISON.md)
 │       ├── evaluation/             [W6] metrics: sacreBLEU, lowercased BLEU, chrF, exact match, by-length;
 │       │                           [W7] paired bootstrap significance; [W8] statistics (multi-seed tests)
@@ -119,8 +121,8 @@ Dependencies point **downwards only**. Lower layers never import higher ones.
 | `utils` | stdlib, torch, numpy, yaml | any `aiayn.*` |
 | `modules` | `utils`, torch | `models`, `data`, `training`, `inference`, `evaluation`, `tracking` |
 | `models` | `modules`, `utils` | `data`, `training`, `inference`, `evaluation`, `tracking` |
-| `data` | `utils`, sentencepiece, datasets | `modules`, `models`, `training`, `inference` |
-| `evaluation` | `utils`, sacrebleu | `modules`, `models`, `training` |
+| `data` | `utils`, sentencepiece, sacremoses (IWSLT recipe), datasets | `modules`, `models`, `training`, `inference` |
+| `evaluation` | `utils`, sacrebleu, sacremoses (fairseq-style BLEU) | `modules`, `models`, `training` |
 | `tracking` | `utils`, wandb/tensorboard (optional) | `modules`, `models`, `data`, `training` |
 | `inference` | `models`, `modules`, `data`, `evaluation`, `utils` | `training` (ADR-019: the evaluation pipeline decodes, then scores) |
 | `training` | `models`, `data`, `evaluation`, `tracking`, `inference`, `utils` | none of the above restrictions |

@@ -41,7 +41,11 @@ ALLOWED: dict[str, set[str]] = {
 }
 
 # Third-party modules restricted to specific packages.
-RESTRICTED_THIRD_PARTY = {"sentencepiece": {"data"}, "sacrebleu": {"evaluation"}}
+RESTRICTED_THIRD_PARTY = {
+    "sentencepiece": {"data"},
+    "sacrebleu": {"evaluation"},
+    "sacremoses": {"data", "evaluation"},
+}
 
 
 def _imports(path: Path) -> list[tuple[int, str]]:

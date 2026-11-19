@@ -7,6 +7,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import sys
 
 from aiayn.data.config import load_data_config
 from aiayn.data.datasets import read_lines
@@ -19,6 +20,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", required=True)
     parser.add_argument("--override", action="append", default=[], metavar="KEY=VALUE")
     args = parser.parse_args(argv)
+    if hasattr(sys.stdout, "reconfigure"):  # Windows consoles cannot print SentencePiece "▁"
+        sys.stdout.reconfigure(errors="backslashreplace")
 
     config = load_data_config(args.config, tuple(args.override))
     if config.translation is None:

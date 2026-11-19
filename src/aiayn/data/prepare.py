@@ -4,11 +4,13 @@ Layout under ``<root>`` (``translation.root``, repository-relative by default)::
 
     raw/<name>/<file from URL>          downloaded archives (checksummed)
     processed/<name>/<split>.<lang>     plain UTF-8 text, one sentence per line
+    processed/<name>/MANIFEST.json      archive recipes only: source hash, counts, file hashes
 """
 
 from __future__ import annotations
 
 import gzip
+import json
 import shutil
 import urllib.parse
 import urllib.request
@@ -16,7 +18,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from aiayn.data.config import SPLITS, DataConfig, DownloadSpec, Split
+from aiayn.data.config import SPLITS, ArchiveSource, DataConfig, DownloadSpec, Split
 from aiayn.data.datasets import read_parallel_text
 from aiayn.utils.hashing import sha256_file
 from aiayn.utils.paths import resolve_path
@@ -118,6 +120,46 @@ def _extract(spec: DownloadSpec, archive: Path, out: Path) -> None:
     tmp.replace(out)
 
 
+def _write_lines(path: Path, lines: Sequence[str]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text("".join(line + "\n" for line in lines), encoding="utf-8", newline="")
+    tmp.replace(path)
+
+
+def _prepare_archive(config: DataConfig, paths: DataPaths, archive: Path) -> None:
+    """Run the archive's recipe once; ``MANIFEST.json`` makes it idempotent (ADR-023)."""
+    assert config.translation is not None and config.translation.archive is not None
+    source: ArchiveSource = config.translation.archive
+    manifest_path = paths.processed_dir / "MANIFEST.json"
+    langs = (config.translation.src_lang, config.translation.tgt_lang)
+    outputs = [paths.text_file(s, lang) for s in SPLITS for lang in langs]
+    if manifest_path.is_file() and all(p.is_file() for p in outputs):
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("archive_sha256") == source.sha256 and manifest.get("files") == {
+            p.name: sha256_file(p) for p in outputs
+        }:
+            return
+    from aiayn.data.iwslt import read_iwslt14  # recipe-specific (needs sacremoses)
+
+    splits = read_iwslt14(archive)
+    expected = {"train": source.train_lines, "valid": source.valid_lines, "test": source.test_lines}
+    counts = splits.counts()
+    wrong = {s: (counts[s], n) for s, n in expected.items() if n and counts[s] != n}
+    if wrong:
+        raise ChecksumError(f"{source.recipe}: split sizes (got, expected) {wrong}")
+    for split in SPLITS:
+        for lang in langs:
+            _write_lines(paths.text_file(split, lang), splits.splits[split][lang])
+    manifest = {
+        "recipe": source.recipe,
+        "archive_sha256": source.sha256,
+        "counts": counts,
+        "files": {p.name: sha256_file(p) for p in outputs},
+    }
+    _write_lines(manifest_path, [json.dumps(manifest, indent=2)])
+
+
 def prepare_translation_data(
     config: DataConfig,
     base: str | Path | None = None,
@@ -129,6 +171,16 @@ def prepare_translation_data(
     paths = data_paths(config, base)
     assert config.translation is not None
     t = config.translation
+    if t.archive is not None:
+        filename = Path(urllib.parse.urlparse(t.archive.url).path).name
+        archive = download(
+            t.archive.url,
+            paths.raw_dir / filename,
+            sha256=t.archive.sha256,
+            timeout=timeout,
+            mirror_dirs=mirror_dirs,
+        )
+        _prepare_archive(config, paths, archive)
     for spec in t.downloads:
         filename = Path(urllib.parse.urlparse(spec.url).path).name
         archive = download(

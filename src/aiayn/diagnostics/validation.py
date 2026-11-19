@@ -38,8 +38,13 @@ from aiayn.data.special_tokens import BOS_ID, EOS_ID, NUM_SPECIAL_TOKENS, PAD_ID
 from aiayn.data.tokenizer import SentencePieceTokenizer, train_sentencepiece
 from aiayn.diagnostics.packaging import MANIFEST_NAME
 from aiayn.diagnostics.report import Outcome, Report, Status
-from aiayn.models import ModelConfig, Transformer, build_transformer, expected_parameter_count
-from aiayn.models.config import load_model_config
+from aiayn.models import (
+    AnyModelConfig,
+    EncoderDecoder,
+    analytic_parameter_count,
+    build_model,
+    load_any_model_config,
+)
 from aiayn.modules import LayerNorm, MultiHeadAttention
 from aiayn.utils.config import config_to_dict
 from aiayn.utils.params import count_parameters
@@ -131,7 +136,7 @@ def _autocast(state: _State) -> Any:
     return torch.autocast(device_type=state.device.type, dtype=state.amp_dtype)
 
 
-def _loss(model: Transformer, batch: Batch) -> torch.Tensor:
+def _loss(model: EncoderDecoder, batch: Batch) -> torch.Tensor:
     """Plain token-level cross-entropy in float32 (diagnostic only; the training loss with
     label smoothing arrives in Week 5)."""
     logits = model(batch.src, batch.tgt_in)
@@ -163,7 +168,7 @@ def _worst_case_batch(state: _State, max_tokens: int) -> tuple[Batch, int]:
     return Collator(PAD_ID)(examples), batch_size * length
 
 
-def _saved_activation_bytes(model: Transformer, batch: Batch, state: _State) -> int:
+def _saved_activation_bytes(model: EncoderDecoder, batch: Batch, state: _State) -> int:
     """Bytes of unique tensors autograd keeps for backward during one forward pass."""
     seen: dict[tuple[str, int], int] = {}
 
@@ -457,15 +462,16 @@ def _train_batches(state: _State) -> Iterator[Batch]:
 
 @dataclass
 class _ModelRun:
-    config: ModelConfig
-    model: Transformer | None = None
+    config: AnyModelConfig  # Transformer or RNN baseline (ADR-021, ADR-023)
+    model: EncoderDecoder | None = None
 
 
 def _check_model_build(run: _ModelRun, state: _State, seed: int) -> Outcome:
-    model = build_transformer(run.config, vocab_size=state.vocab_size, pad_id=PAD_ID, seed=seed)
+    model = build_model(run.config, vocab_size=state.vocab_size, pad_id=PAD_ID, seed=seed)
     counted = count_parameters(model)
-    expected = expected_parameter_count(run.config, state.vocab_size)
-    tied_ok = (model.output_weight is model.src_embedding.weight) == run.config.tie_weights
+    expected = analytic_parameter_count(run.config, state.vocab_size)
+    shared = getattr(model, "output_weight", None) is getattr(model, "src_embedding", None).weight  # type: ignore[union-attr]
+    tied_ok = shared == run.config.tie_weights
     run.model = model.to(state.device)
     details = {"parameters": counted, "expected": expected, "tied": run.config.tie_weights}
     ok = counted == expected and tied_ok
@@ -482,7 +488,7 @@ def _check_forward(run: _ModelRun, state: _State) -> Outcome:
     )
     batch = batch.to(state.device)
     model.eval()
-    model.debug_checks = True
+    model.debug_checks = True  # Transformer-only invariants; ignored by RNNs
     with torch.no_grad():
         logits = model(batch.src, batch.tgt_in)
         loss = F.cross_entropy(
@@ -491,7 +497,10 @@ def _check_forward(run: _ModelRun, state: _State) -> Outcome:
             ignore_index=PAD_ID,
         ).item()
     model.debug_checks = False
-    low, high = math.log(state.vocab_size), math.log(state.vocab_size) + 1.5
+    # Untrained models sit near uniform (log V). The floor allows a small head start (the
+    # Bahdanau readout sees the previous token: 8.965 vs log V 8.99 at init) while still
+    # catching label leakage (loss near 0); the ceiling catches broken initialization.
+    low, high = math.log(state.vocab_size) - 0.5, math.log(state.vocab_size) + 1.5
     details = {
         "logits_shape": list(logits.shape),
         "initial_loss": round(loss, 4),
@@ -554,9 +563,13 @@ def _check_memory(run: _ModelRun, state: _State, max_tokens: int) -> Outcome:
         est_state = replace(state, amp_dtype=torch.bfloat16)
         sentences = min(2, batch.batch_size)
         probe, _ = _worst_case_batch(state, sentences * int(batch.src.shape[1]))
-        activations = (
-            _saved_activation_bytes(model, probe, est_state) * batch.batch_size / sentences
-        )
+        precision = "bfloat16 (as a stand-in for fp16)"
+        try:
+            saved = _saved_activation_bytes(model, probe, est_state)
+        except RuntimeError:  # e.g. oneDNN has no bf16 LSTM kernel on this CPU
+            saved = _saved_activation_bytes(model, probe, replace(state, amp_dtype=None)) // 2
+            precision = "float32 halved (bf16 unsupported for this model on this CPU)"
+        activations = saved * batch.batch_size / sentences
         static_estimate = 18 * n_params  # fp32 weights + grads + 2 Adam moments + fp16 cache
         logits_transient = batch.tgt_out.numel() * state.vocab_size * 4 * 2  # fp32 logits + grad
         estimate = static_estimate + activations + logits_transient
@@ -566,7 +579,7 @@ def _check_memory(run: _ModelRun, state: _State, max_tokens: int) -> Outcome:
                 "saved_activations_mib": round(activations / MiB, 1),
                 "logits_transient_mib": round(logits_transient / MiB, 1),
                 "estimated_peak_mib": round(estimate / MiB, 1),
-                "estimate_precision": "bfloat16 (as a stand-in for fp16)",
+                "estimate_precision": precision,
             }
         )
         return Outcome(
@@ -830,7 +843,9 @@ def run_validation(options: ValidationOptions, output_dir: Path | None = None) -
     assert state.data_config is not None
     max_tokens = options.vram_max_tokens or state.data_config.batching.max_tokens
     for path in options.model_configs:
-        _run_model_checks(report, _ModelRun(load_model_config(path)), state, options, max_tokens)
+        _run_model_checks(
+            report, _ModelRun(load_any_model_config(path)), state, options, max_tokens
+        )
 
     if options.check_training_resume:
         report.run("training.resume", lambda: _check_training_resume(state), critical=False)

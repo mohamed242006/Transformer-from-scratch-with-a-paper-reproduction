@@ -10,4 +10,5 @@ data/
 ```
 
 Everything here is reproducible with `scripts/prepare_data.py` and `scripts/train_tokenizer.py` (Week 2).
+IWSLT'14 (`configs/data/iwslt14.yaml`, ADR-023) is built from one pinned archive; `processed/iwslt14/MANIFEST.json` records its counts and file hashes.
 Owner: Data owner. Contract: [docs/REPOSITORY.md](../docs/REPOSITORY.md#data-gitignored).

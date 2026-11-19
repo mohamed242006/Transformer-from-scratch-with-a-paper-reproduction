@@ -1,0 +1,8 @@
+# Week 9 Phase 1 pilot (ADR-023 §8): 6,000 updates; same data, decoding and clipping rules as Phase 2.
+# RNNs: clip_norm 1.0, the one declared difference (ADR-021).
+name: iwslt14_pilot_gru_bahdanau
+data: iwslt14
+model: gru_bahdanau_iwslt
+train: iwslt_pilot
+overrides:
+  - train.clip_norm=1.0

@@ -14,6 +14,14 @@ Contract (B batch, S source length, T decoder length, V vocabulary):
   decoding by recomputing the prefix is exact for every model.
 * ``generator(hidden) -> logits [B,T,V]``: raw logits, no softmax.
 * ``max_positions``: the decode-length cap (the Transformer's positional table size).
+
+Incremental decoding (ADR-023 §6), used by beam/greedy search when available:
+
+* ``init_state(memory, src_mask) -> state``: after beam expansion of the memory;
+* ``decode_step(tokens [N], state) -> (hidden [N, *], state)``: feed the newest token;
+* ``reorder_state(state, rows [N]) -> state``: beam reselection of batch rows.
+
+Each step must equal ``decode`` over the whole prefix at the last position (tested).
 """
 
 from __future__ import annotations
@@ -31,6 +39,9 @@ class EncoderDecoder(nn.Module):
 
     vocab_size: int
     pad_id: int
+    #: Expensive invariant checks on every call (Transformer: masks, token ranges, finite
+    #: logits). Models without such checks ignore it.
+    debug_checks: bool = False
 
     @property
     def max_positions(self) -> int:
@@ -52,6 +63,18 @@ class EncoderDecoder(nn.Module):
         raise NotImplementedError
 
     def generator(self, hidden: torch.Tensor) -> torch.Tensor:
+        raise NotImplementedError
+
+    #: True when ``init_state``/``decode_step``/``reorder_state`` are implemented.
+    supports_incremental: bool = False
+
+    def init_state(self, memory: Any, src_mask: torch.Tensor) -> Any:
+        raise NotImplementedError
+
+    def decode_step(self, tokens: torch.Tensor, state: Any) -> tuple[torch.Tensor, Any]:
+        raise NotImplementedError
+
+    def reorder_state(self, state: Any, rows: torch.Tensor) -> Any:
         raise NotImplementedError
 
     def forward(self, src: torch.Tensor, tgt_in: torch.Tensor) -> torch.Tensor:

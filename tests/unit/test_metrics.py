@@ -41,3 +41,31 @@ def test_bleu_by_length_buckets() -> None:
 def test_invalid_inputs(hyps: list[str], refs: list[str]) -> None:
     with pytest.raises(ValueError):
         corpus_scores(hyps, refs)
+
+
+# ----------------------------------------------------------------------------- ADR-023 protocol B
+def test_fairseq_normalization_matches_prepare_iwslt14() -> None:
+    from aiayn.evaluation.metrics import fairseq_normalize
+
+    text = 'It\u2019s a "test" & more, isn\'t it?'
+    assert fairseq_normalize(text, "en") == (
+        "it &apos;s a &quot; test &quot; &amp; more , isn &apos;t it ?"
+    )
+
+
+def test_fairseq_bleu_is_tokenized_lowercased_corpus_bleu() -> None:
+    from sacrebleu.metrics.bleu import BLEU
+
+    from aiayn.evaluation.metrics import corpus_scores, fairseq_bleu, fairseq_normalize
+
+    hyps = ["The Cat sat on the mat.", "It\u2019s raining, isn't it?"]
+    refs = ["the cat sat on the mat .".replace(" .", "."), "It's raining, isn't it?"]
+    score, signature = fairseq_bleu(hyps, refs, "en")
+    manual = BLEU(tokenize="none", smooth_method="none", force=True).corpus_score(
+        [fairseq_normalize(h, "en") for h in hyps], [[fairseq_normalize(r, "en") for r in refs]]
+    )
+    assert score == pytest.approx(manual.score) and score == pytest.approx(100.0)
+    assert "fairseq-style" in signature and "sacremoses" in signature
+    scores = corpus_scores(hyps, refs, fairseq_lang="en")
+    assert scores["bleu_fairseq"] == 100.0 and scores["bleu"] < 100.0  # cased sacreBLEU differs
+    assert "bleu_fairseq" not in corpus_scores(hyps, refs)

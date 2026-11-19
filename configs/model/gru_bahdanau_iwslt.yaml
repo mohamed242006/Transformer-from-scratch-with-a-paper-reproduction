@@ -1,0 +1,14 @@
+# IWSLT14 baseline (ADR-021, ADR-023): BiGRU encoder, GRU decoder, additive attention.
+# One layer as in Bahdanau et al. (2015; 1000 units there). 36,565,136 parameters with
+# the 10k joint vocabulary (-0.27% vs transformer_iwslt's 36,663,296).
+name: gru_bahdanau_iwslt
+architecture: rnn
+cell: gru
+attention: bahdanau
+embedding_dim: 512
+hidden_size: 1104
+num_layers: 1
+bidirectional_encoder: true
+dropout: 0.3            # as transformer_iwslt
+tie_weights: true
+max_positions: 1024

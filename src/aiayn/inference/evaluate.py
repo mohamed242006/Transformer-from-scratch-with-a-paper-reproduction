@@ -128,7 +128,8 @@ def evaluate_run(
         source_lengths = [len(s) for s in source_ids]
     seconds = time.perf_counter() - start
 
-    scores = corpus_scores(hypotheses, references)
+    fairseq_lang = info.data_config.translation.tgt_lang if info.data_config.translation else None
+    scores = corpus_scores(hypotheses, references, fairseq_lang=fairseq_lang)
     tag = eval_tag(split, checkpoint, decode)
     result: dict[str, Any] = {
         "run": info.name,

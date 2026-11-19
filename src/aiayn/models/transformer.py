@@ -22,7 +22,7 @@ from torch import nn
 
 from aiayn.models.base import EncoderDecoder
 from aiayn.models.config import ModelConfig
-from aiayn.modules.decoder import Decoder
+from aiayn.modules.decoder import Decoder, LayerCache
 from aiayn.modules.embedding import TokenEmbedding
 from aiayn.modules.encoder import Encoder
 from aiayn.modules.feedforward import PositionwiseFeedForward
@@ -35,7 +35,7 @@ from aiayn.modules.masking import (
 from aiayn.modules.multihead import MultiHeadAttention
 from aiayn.modules.positional import LearnedPositionalEmbedding, SinusoidalPositionalEncoding
 
-__all__ = ["AttentionMaps", "ModelOutput", "Transformer", "build_transformer"]
+__all__ = ["AttentionMaps", "DecoderState", "ModelOutput", "Transformer", "build_transformer"]
 
 Positional = SinusoidalPositionalEncoding | LearnedPositionalEmbedding
 
@@ -60,6 +60,15 @@ class AttentionMaps:
     encoder_self: tuple[torch.Tensor, ...]
     decoder_self: tuple[torch.Tensor, ...]
     decoder_cross: tuple[torch.Tensor, ...]
+
+
+@dataclass
+class DecoderState:
+    """Incremental decoding: per-layer key/value caches, source mask, tokens consumed."""
+
+    caches: list[LayerCache]
+    src_mask: torch.Tensor  # [B, 1, 1, S]
+    position: int = 0
 
 
 @dataclass(frozen=True)
@@ -254,6 +263,29 @@ class Transformer(EncoderDecoder):
         if self.debug_checks and not bool(torch.isfinite(logits).all()):
             raise FloatingPointError("non-finite logits")
         return ModelOutput(logits, AttentionMaps(enc_maps, self_maps, cross_maps))
+
+    # ------------------------------------------------------------------ #
+    # Incremental decoding (ADR-023 §6)
+    # ------------------------------------------------------------------ #
+    supports_incremental = True
+
+    def init_state(self, memory: torch.Tensor, src_mask: torch.Tensor) -> DecoderState:
+        return DecoderState(self.decoder.start(memory), src_mask)
+
+    def decode_step(
+        self, tokens: torch.Tensor, state: DecoderState
+    ) -> tuple[torch.Tensor, DecoderState]:
+        """Newest token per row ``tokens [N]`` -> ``hidden [N, d]`` at that position."""
+        y = self.tgt_positional(self.tgt_embedding(tokens[:, None]), offset=state.position)
+        hidden = self.decoder.step(y, state.caches, state.src_mask)
+        state.position += 1
+        return hidden[:, 0], state
+
+    def reorder_state(self, state: DecoderState, rows: torch.Tensor) -> DecoderState:
+        for cache in state.caches:
+            cache.reorder(rows)
+        state.src_mask = state.src_mask[rows]
+        return state
 
     def forward(self, src: torch.Tensor, tgt_in: torch.Tensor) -> torch.Tensor:
         """Teacher-forced logits ``[B, T, V]`` for ``src [B, S]`` and ``tgt_in [B, T]``."""

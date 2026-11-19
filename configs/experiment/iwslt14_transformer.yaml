@@ -1,0 +1,5 @@
+# Week 9 Phase 2 benchmark (ADR-023). peak_lr is set from the Phase 1 pilot before launch.
+name: iwslt14_transformer
+data: iwslt14
+model: transformer_iwslt
+train: iwslt_t4
