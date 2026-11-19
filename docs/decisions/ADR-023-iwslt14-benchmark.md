@@ -172,3 +172,33 @@ These grids bracket each default from both sides; Week 8's optima all sat at the
   - the ADR-023 rules end to end.
 - `tests/policy/test_layering.py`: `sacremoses` is allowed in `data` and `evaluation` only.
 - `tests/unit/test_pilot.py`: gate verdicts in GO, NO-GO and pending cases; the G2 margin; edge flags; Phase 2 time projection; validation-report parsing; script exit codes.
+
+## Amendment 1 (2026-11-19): T4 validation results and memory-equivalent batching
+
+**Kaggle validation on a T4,** worst-case batch at 8,192 tokens per side:
+
+| Model | Memory | Peak allocated | Target tok/s |
+|---|---|---|---|
+| transformer_iwslt | PASS | 4,723 MiB | 24,963 |
+| bilstm_luong_iwslt | PASS | 1,990 MiB | 49,820 |
+| gru_bahdanau_iwslt | **FAIL: CUDA out of memory** | > T4 capacity | not measured |
+
+**Cause:** additive attention evaluates `tanh(W_q s + U_k h)` at every decoder step and keeps a `[B, 1, S, 1104]` tensor per step for the backward pass. That is `B·T·S·1104` values per batch, which grows with sentence length squared (the CPU estimate was 16.3 GB).
+
+**Decision: gradient accumulation at an identical effective update size.** GRU + Bahdanau (pilot and Phase 2) uses `data.batching.max_tokens=4096` with `train.update_freq=2`; the other models keep 8,192 × 1.
+- **Same gradient:** the loss of an update is normalized by the update's total target tokens across its micro-batches (ADR-017; `test_gradient_accumulation_equals_one_large_batch`). The accumulated gradient is therefore the gradient of the combined batch.
+- **Same schedule:** updates per epoch, effective update size (8,192 tokens) and the learning-rate schedule are unchanged.
+- **What differs:** only which sentences share a micro-batch (token-budget bucketing), and dropout masks, which are random anyway.
+- **Peak memory roughly halves,** because activations are linear in the number of sentences at a fixed length.
+- **Cost:** wall time only. The GRU needs twice as many micro-batches, and therefore twice as many Python time-step loops, per update.
+
+**Alternatives rejected:**
+- **Lower `filter.max_len` for every model:** changes everyone's data to suit one model.
+- **Per-step activation checkpointing in the attention:** a new code path that recomputes every step, so slower.
+- **Dropping the GRU baseline:** unnecessary.
+
+**Fairness rule (ADR-021 updated):**
+- Gradient accumulation is a declared difference, allowed only while `max_tokens × update_freq` equals the reference's.
+- `compare_runs.py` and the study report now compare data configs with the micro-batch size factored out. They separately PASS or FAIL "same effective update size", listing which runs accumulate.
+
+**Fallback:** if the T4 re-validation at 4,096 still fails, use 2,048 × 4. The rules and checks are unchanged; only the two override values change.

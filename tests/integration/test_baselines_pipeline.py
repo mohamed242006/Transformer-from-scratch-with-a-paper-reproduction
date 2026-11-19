@@ -131,3 +131,39 @@ def test_summary_requires_the_evaluation(runs: dict[str, Path]) -> None:
     assert summary.description.startswith("BiLSTM 2L H=24 + Luong")
     with pytest.raises(FileNotFoundError, match="evaluate"):
         summarize_run(runs["rnn"], "test.best.beam4")
+
+
+def _accumulating_run(tmp_path: Path, max_tokens: int, update_freq: int) -> Path:
+    raw = rnn_experiment(max_updates=8, clip_norm=1.0).to_dict()
+    raw["data"]["batching"]["max_tokens"] = max_tokens
+    raw["train"]["update_freq"] = update_freq
+    run_dir = tmp_path / f"rnn_{max_tokens}x{update_freq}"
+    Trainer.create(experiment_from_dict(raw), run_dir).train()
+    evaluate_run(
+        run_dir,
+        split="valid",
+        checkpoint="averaged",
+        decode=DecodeConfig(beam_size=2, max_len_b=12),
+        device="cpu",
+    )
+    return run_dir
+
+
+def test_gradient_accumulation_at_equal_update_size_is_fair(
+    runs: dict[str, Path], tmp_path: Path
+) -> None:
+    """ADR-023 §8: a memory-bound model may use smaller micro-batches with accumulation,
+    as long as max_tokens x update_freq equals the reference's (here 96 x 2 = 48 x 4)."""
+    equal = _accumulating_run(tmp_path, 48, 4)
+    text = build_comparison(
+        [runs["transformer"], equal], tag="valid.averaged.beam2", significance=False
+    )
+    assert "PASS: same data configuration" in text
+    assert "PASS: same effective update size (192 tokens" in text
+    assert "gradient accumulation:" in text and "rnn_48x4: 48 x 4" in text
+    assert "(undeclared" not in text  # update_freq is a declared difference
+    smaller = _accumulating_run(tmp_path, 48, 2)
+    text = build_comparison(
+        [runs["transformer"], smaller], tag="valid.averaged.beam2", significance=False
+    )
+    assert "**FAIL**: same effective update size" in text

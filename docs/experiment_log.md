@@ -367,3 +367,23 @@ Week 8's config pins its old rules.
 - **Verified:** with the fake shadowing package present, the policy, parity and numerical suites pass. Full suite: 641 passed.
 
 **Lesson:** never rely on generic top-level names (`tests`, `scripts`, `utils`) as implicit namespace packages in environments with large, unknown site-packages.
+
+---
+
+## 2026-11-19 · Week 9 Phase 1: T4 validation and the GRU memory fix
+
+**Kaggle validation (owner, T4, IWSLT14 config, worst-case batch at 8,192 tokens per side):**
+
+| Model | Memory | Peak allocated | Target tok/s |
+|---|---|---|---|
+| transformer_iwslt | PASS | 4,723 MiB | 24,963 |
+| bilstm_luong_iwslt | PASS | 1,990 MiB | 49,820 |
+| gru_bahdanau_iwslt | **FAIL: CUDA out of memory** (allocation reached 10.24 GiB) | — | — |
+
+- **The CPU estimate predicted this** (16.3 GB, entry above): additive attention keeps a `[B, T, S, 1104]` activation, which grows with length squared.
+- **BiLSTM + Luong runs at twice the Transformer's tokens/s.** As on Multi30k, cuDNN recurrences are fast at this scale.
+- **The Transformer's throughput matches Week 5's measurement** (24,669 tok/s).
+
+**Fix (ADR-023 Amendment 1):** GRU + Bahdanau uses 4,096-token micro-batches × 2 accumulation steps. The effective update size (8,192 tokens), per-update token normalization and learning-rate schedule are identical to the other models. Fairness checks now compare data configs without the micro-batch size and verify the effective update size separately; tested in both directions (equal passes, smaller fails).
+
+**Next:** re-validate GRU at 4,096 on the T4. If it passes, run the pilot. If it fails, use the 2,048 × 4 fallback.

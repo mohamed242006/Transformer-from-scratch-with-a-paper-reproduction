@@ -212,3 +212,56 @@ def test_validation_report_summary(study: Any, tmp_path: Path) -> None:
         validation_report=report,
     )
     assert "Kaggle validation" in path.read_text("utf-8")
+
+
+# --------------------------------------------------- memory-equivalent batching (ADR-023)
+def test_pilot_experiments_share_the_effective_update_size() -> None:
+    from aiayn.inference.comparison import data_signature, update_tokens
+    from aiayn.training.experiment import load_experiment
+
+    configs = {
+        name: load_experiment(REPO / "configs" / "experiment" / f"{name}.yaml").to_dict()
+        for name in (
+            "iwslt14_pilot_transformer",
+            "iwslt14_pilot_gru_bahdanau",
+            "iwslt14_pilot_bilstm_luong",
+            "iwslt14_transformer",
+            "iwslt14_gru_bahdanau",
+            "iwslt14_bilstm_luong",
+        )
+    }
+    assert {update_tokens(c) for c in configs.values()} == {8192}
+    assert len({data_signature(c) for c in configs.values()}) == 1
+    gru = configs["iwslt14_pilot_gru_bahdanau"]
+    assert (gru["data"]["batching"]["max_tokens"], gru["train"]["update_freq"]) == (4096, 2)
+
+
+def test_later_validation_reports_override_per_model() -> None:
+    first = {
+        "checks": [
+            {
+                "name": "model[gru_bahdanau_iwslt].memory",
+                "status": "fail",
+                "details": {"max_tokens": 8192, "estimated_peak_mib": 16305.0},
+            },
+            {
+                "name": "model[transformer_iwslt].memory",
+                "status": "pass",
+                "details": {"max_tokens": 8192, "peak_allocated_mib": 4723.0},
+            },
+        ]
+    }
+    second = {
+        "checks": [
+            {
+                "name": "model[gru_bahdanau_iwslt].memory",
+                "status": "pass",
+                "details": {"max_tokens": 4096, "peak_allocated_mib": 7100.0},
+            }
+        ]
+    }
+    summary = validation_report_summary([first, second])
+    assert summary["gru_bahdanau_iwslt"]["memory_status"] == "pass"
+    assert summary["gru_bahdanau_iwslt"]["max_tokens"] == 4096
+    assert summary["gru_bahdanau_iwslt"]["peak_allocated_mib"] == 7100.0
+    assert summary["transformer_iwslt"]["peak_allocated_mib"] == 4723.0

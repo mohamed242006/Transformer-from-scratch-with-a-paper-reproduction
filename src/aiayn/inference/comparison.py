@@ -30,11 +30,20 @@ from aiayn.evaluation.statistics import format_p
 from aiayn.inference.evaluate import load_references
 from aiayn.utils.config import load_yaml
 
-__all__ = ["RunSummary", "build_comparison", "summarize_run", "write_comparison"]
+__all__ = [
+    "RunSummary",
+    "build_comparison",
+    "data_signature",
+    "summarize_run",
+    "update_tokens",
+    "write_comparison",
+]
 
 PARAMETER_TOLERANCE = 0.10
-#: Training keys that may differ between model families by protocol (ADR-021).
-DECLARED_TRAIN_DIFFERENCES = frozenset({"clip_norm"})
+#: Training keys that may differ between model families by protocol: gradient clipping
+#: (ADR-021) and gradient accumulation, allowed only while the effective update size
+#: ``max_tokens x update_freq`` is identical (ADR-023 §8, memory-equivalent batching).
+DECLARED_TRAIN_DIFFERENCES = frozenset({"clip_norm", "update_freq"})
 #: Keys that never affect the result (run control, seeds are reported separately).
 IGNORED_TRAIN_KEYS = frozenset(
     {"name", "seed", "time_budget_minutes", "log_every", "loggers", "device"}
@@ -122,6 +131,19 @@ def summarize_run(run_dir: str | Path, tag: str = "test.averaged.beam4") -> RunS
     )
 
 
+def update_tokens(config: dict[str, Any]) -> int:
+    """Effective update size: token budget per micro-batch x accumulated micro-batches."""
+    budget = int(config["data"]["batching"]["max_tokens"])
+    return budget * int(config["train"].get("update_freq", 1))
+
+
+def data_signature(config: dict[str, Any]) -> str:
+    """The data configuration without the micro-batch size (checked via ``update_tokens``)."""
+    data = json.loads(json.dumps(config["data"]))
+    data.get("batching", {}).pop("max_tokens", None)
+    return json.dumps(data, sort_keys=True)
+
+
 def _train_differences(reference: dict[str, Any], other: dict[str, Any]) -> list[str]:
     keys = sorted((set(reference) | set(other)) - IGNORED_TRAIN_KEYS)
     return [k for k in keys if reference.get(k) != other.get(k)]
@@ -136,8 +158,20 @@ def _fairness(runs: list[RunSummary], references: list[list[str]]) -> list[str]:
 
     others = runs[1:]
     check(
-        all(r.config["data"] == ref.config["data"] for r in others),
-        "same data configuration (corpus, filters, splits, batching)",
+        all(data_signature(r.config) == data_signature(ref.config) for r in others),
+        "same data configuration (corpus, filters, splits, batching apart from micro-batch size)",
+    )
+    accumulating = [
+        f"{r.name}: {r.config['data']['batching']['max_tokens']} x "
+        f"{r.config['train'].get('update_freq', 1)}"
+        for r in runs
+        if int(r.config["train"].get("update_freq", 1)) > 1
+    ]
+    check(
+        all(update_tokens(r.config) == update_tokens(ref.config) for r in others),
+        f"same effective update size ({update_tokens(ref.config):,} tokens = max_tokens x "
+        "update_freq)"
+        + (f"; gradient accumulation: {', '.join(accumulating)}" if accumulating else ""),
     )
     check(all(r.tokenizer == ref.tokenizer for r in others), "same tokenizer fingerprint")
     check(all(refs == references[0] for refs in references[1:]), "same reference lines")

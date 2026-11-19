@@ -40,6 +40,7 @@ from aiayn.study.plan import (
     variant_run,
 )
 from aiayn.study.storage import RunState
+from aiayn.utils.config import load_yaml
 
 __all__ = ["RunLog", "build_pilot_report", "read_log", "validation_report_summary"]
 
@@ -67,6 +68,7 @@ class RunLog:
     updates: int = 0
     max_grad_norm: float | None = None
     wall_minutes: float | None = None
+    batching: str = "-"  # micro-batch tokens x accumulated micro-batches
 
     @property
     def minutes_per_1k(self) -> float | None:
@@ -90,6 +92,14 @@ def read_log(state: RunState, *, name: str, model: str, variant: str, valid_tag:
     if valid_tag in state.evals:
         log.valid_bleu = float(state.evals[valid_tag]["bleu"])
     log.wall_minutes = _wall_minutes(state.metadata)
+    config_path = state.path / "config.yaml"
+    if config_path.is_file():
+        config = load_yaml(config_path)
+        try:
+            tokens = config["data"]["batching"]["max_tokens"]
+            log.batching = f"{tokens} x {config['train'].get('update_freq', 1)}"
+        except (KeyError, TypeError):
+            pass
     path = state.path / "metrics.jsonl"
     if not path.is_file():
         return log
@@ -116,10 +126,18 @@ def read_log(state: RunState, *, name: str, model: str, variant: str, valid_tag:
     return log
 
 
-def validation_report_summary(report: Mapping[str, Any]) -> dict[str, dict[str, Any]]:
-    """Per model: measured peak memory and throughput from ``kaggle_validate`` JSON."""
+def validation_report_summary(
+    report: Mapping[str, Any] | Sequence[Mapping[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    """Per model: measured peak memory and throughput from ``kaggle_validate`` JSON.
+
+    Several reports may be given (e.g. a re-validation of one model at a smaller
+    micro-batch); later reports override earlier ones per model.
+    """
+    reports = [report] if isinstance(report, Mapping) else list(report)
     out: dict[str, dict[str, Any]] = {}
-    for check in report.get("checks", []):
+    checks = [c for r in reports for c in r.get("checks", [])]
+    for check in checks:
         name = str(check.get("name", ""))
         if not name.startswith("model[") or "]." not in name:
             continue
@@ -127,6 +145,9 @@ def validation_report_summary(report: Mapping[str, Any]) -> dict[str, dict[str, 
         details = check.get("details") or {}
         entry = out.setdefault(model, {})
         if kind == "memory":
+            entry.pop("peak_allocated_mib", None)  # a later report replaces the measurement
+            if "max_tokens" in details:
+                entry["max_tokens"] = details["max_tokens"]
             for key in (
                 "peak_allocated_mib",
                 "peak_reserved_mib",
@@ -200,7 +221,7 @@ def build_pilot_report(
     *,
     transformer: str = "transformer",
     pre_ln_variant: str = "pre_ln",
-    validation_report: Mapping[str, Any] | None = None,
+    validation_report: Mapping[str, Any] | Sequence[Mapping[str, Any]] | None = None,
     phase2_updates: int = 30000,
     phase2_seeds: int = 3,
 ) -> tuple[str, dict[str, Any]]:
@@ -250,14 +271,16 @@ def build_pilot_report(
         "",
         "## 2. Throughput, memory and stability (T4 training logs)",
         "",
-        "| Run | Peak LR | Target tok/s | Peak MiB | Skipped fp16 | Max grad norm "
-        "| Final train NLL | Best valid NLL | Valid BLEU | Min per 1k updates | Phase 2 run (h) |",
-        "|---|---|---|---|---|---|---|---|---|---|---|",
+        "| Run | Peak LR | Batch (tokens x accum) | Target tok/s | Peak MiB | Skipped fp16 "
+        "| Max grad norm | Final train NLL | Best valid NLL | Valid BLEU | Min per 1k updates "
+        "| Phase 2 run (h) |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for g in pilot.logs:
         projected = g.minutes_per_1k * phase2_updates / 1000 / 60 if g.minutes_per_1k else None
         lines.append(
-            f"| `{g.name}` | {_lr_of(study, g.model, g.variant)} | {_f(g.tokens_per_s, ',.0f')} | "
+            f"| `{g.name}` | {_lr_of(study, g.model, g.variant)} | {g.batching} | "
+            f"{_f(g.tokens_per_s, ',.0f')} | "
             f"{_f(g.peak_mib, '.0f')} | {g.skipped} | {_f(g.max_grad_norm, '.2f')} | "
             f"{_f(g.final_train_nll)} | {_f(g.best_valid_nll)} | {_f(g.valid_bleu, '.2f')} | "
             f"{_f(g.minutes_per_1k, '.1f')} | {_f(projected, '.1f')} |"
@@ -269,14 +292,14 @@ def build_pilot_report(
             "",
             "Kaggle validation (worst-case batch at the data config's token budget):",
             "",
-            "| Model | Parameters | Peak allocated MiB | Peak reserved MiB | Device MiB "
-            "| Target tok/s | ms/step |",
-            "|---|---|---|---|---|---|---|",
+            "| Model | Parameters | Micro-batch tokens | Memory check | Peak allocated MiB "
+            "| Peak reserved MiB | Device MiB | Target tok/s | ms/step |",
+            "|---|---|---|---|---|---|---|---|---|",
         ]
         for model, e in summary.items():
             lines.append(
-                f"| {model} | {_f(e.get('parameters'), ',')} | "
-                f"{_f(e.get('peak_allocated_mib'), '.0f')} | "
+                f"| {model} | {_f(e.get('parameters'), ',')} | {_f(e.get('max_tokens'), ',')} | "
+                f"{e.get('memory_status', '-')} | {_f(e.get('peak_allocated_mib'), '.0f')} | "
                 f"{_f(e.get('peak_reserved_mib'), '.0f')} | "
                 f"{_f(e.get('device_total_mib'), '.0f')} | "
                 f"{_f(e.get('target_tokens_per_s'), ',.0f')} | "
@@ -421,7 +444,7 @@ def write_pilot_report(
     states: Mapping[str, RunState],
     out: Path,
     *,
-    validation_report: Mapping[str, Any] | None = None,
+    validation_report: Mapping[str, Any] | Sequence[Mapping[str, Any]] | None = None,
 ) -> Path:
     text, data = build_pilot_report(study, states, validation_report=validation_report)
     out.parent.mkdir(parents=True, exist_ok=True)

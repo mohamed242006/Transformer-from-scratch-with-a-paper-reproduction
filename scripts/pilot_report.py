@@ -26,7 +26,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--work", required=True, type=Path)
     parser.add_argument("--input", type=Path, action="append", default=[])
     parser.add_argument("--unzip-into", type=Path)
-    parser.add_argument("--validation-report", type=Path, help="kaggle_validate JSON report")
+    parser.add_argument(
+        "--validation-report",
+        type=Path,
+        action="append",
+        default=[],
+        help="kaggle_validate JSON report (repeatable; later reports override per model)",
+    )
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args(argv)
 
@@ -35,9 +41,12 @@ def main(argv: list[str] | None = None) -> int:
     if not states:
         print("no pilot runs found", file=sys.stderr)
         return 1
-    report = None
-    if args.validation_report and args.validation_report.is_file():
-        report = json.loads(args.validation_report.read_text(encoding="utf-8"))
+    reports = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in args.validation_report
+        if path.is_file()
+    ]
+    report = reports or None
     out = write_pilot_report(study, states, args.out, validation_report=report)
     text = out.read_text(encoding="utf-8")
     encoding = sys.stdout.encoding or "utf-8"

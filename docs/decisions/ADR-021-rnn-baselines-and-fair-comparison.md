@@ -43,6 +43,8 @@ Week 6 established the Transformer reference on Multi30k EN→DE: `multi30k_tiny
 6. **Significance:** paired bootstrap resampling (Koehn, 2004; sacreBLEU `PairedTest`, 1000 samples) of each system against the reference, reporting the 95% CI and p-value. With several seeds per experiment, mean ± std is added. Single-seed results are reported as such.
 7. **Decoding cost:** every model recomputes the decoder over the prefix at each step, with no KV cache and no carried RNN state. This is exact because the decoders are causal (tested), but decode time compares implementations rather than architectures. Incremental decoding is an extension.
 
+**Amendment (2026-11-19, ADR-023 Amendment 1):** gradient accumulation is a second declared difference. It is allowed only for memory-bound models and only at an identical effective update size (`max_tokens × update_freq`). The fairness checks verify this from the run files.
+
 ## Consequences
 **Positive:**
 - A baseline cannot silently get different data, decoding or scoring.

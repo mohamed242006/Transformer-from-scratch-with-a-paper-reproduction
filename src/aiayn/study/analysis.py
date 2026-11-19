@@ -38,6 +38,7 @@ from aiayn.evaluation.statistics import (
     spearman,
     t_halfwidth,
 )
+from aiayn.inference.comparison import data_signature, update_tokens
 from aiayn.study.config import StudyConfig
 from aiayn.study.plan import (
     DEFAULT,
@@ -584,15 +585,18 @@ class Analyzer:
         fingerprints = {
             s.metadata.get("tokenizer_fingerprint") for s in self.states.values() if s.usable
         }
-        data_configs = {
-            json.dumps(load_yaml(s.path / "config.yaml")["data"], sort_keys=True)
-            for s in self.states.values()
-            if s.usable
-        }
+        configs = [load_yaml(s.path / "config.yaml") for s in self.states.values() if s.usable]
+        data_configs = {data_signature(c) for c in configs if "batching" in c.get("data", {})}
+        budgets = {update_tokens(c) for c in configs if "batching" in c.get("data", {})}
         lines += [
             f"- {_check(len(fingerprints) <= 1)}: one tokenizer fingerprint across all runs.",
-            f"- {_check(len(data_configs) <= 1)}: one data configuration across all runs.",
+            f"- {_check(len(data_configs) <= 1)}: one data configuration across all runs "
+            "(micro-batch size aside).",
+            f"- {_check(len(budgets) <= 1)}: one effective update size (max_tokens x "
+            f"update_freq): {', '.join(f'{b:,}' for b in sorted(budgets)) or '-'} tokens.",
             "- Declared differences: RNN experiments use `train.clip_norm=1.0` (ADR-021); "
+            "memory-bound models may accumulate gradients at an identical effective update "
+            "size (ADR-023 §8); "
             "variants differ only by their listed overrides; seeds by `train.seed`.",
             f"- Tests: two-level paired bootstrap ({self.n} samples; sentences × seeds), p floor "
             f"{format_p(1 / (self.n + 1), self.n)}; Holm-Bonferroni within each table; exact "

@@ -253,6 +253,11 @@ A diverged run (for example at LR ×2) is recorded as `FAILED.json` and reported
 
    The cell prints `pilot report exit: 0` for GO, `2` for NO-GO and `3` while runs are unfinished (run the notebook again with the newest `aiayn-runs` attached).
 
+**GRU + Bahdanau memory (ADR-023 Amendment 1).** At 8,192 tokens it runs out of memory on a T4, so it trains with 4,096-token micro-batches × 2 accumulation steps (the same effective update size). Re-validate it before the pilot:
+- In `kaggle_validate.ipynb` set `MODEL_CONFIGS = ["configs/model/gru_bahdanau_iwslt.yaml"]` and `VRAM_MAX_TOKENS = 4096`.
+- Commit, then check that the memory line says PASS.
+- Attach **both** validation outputs (the full one and the GRU-only one) to the pilot. `PILOT.md` merges them, newest first.
+
 **Phase 2** (after the gate): set `peak_lr` in `configs/experiment/iwslt14_*.yaml` from the pilot, then run the 3-seed benchmark study.
 
 Every evaluation reports sacreBLEU (primary) and `bleu_fairseq` (tokenized lowercased, for literature comparison; ADR-023 §4).
