@@ -60,7 +60,7 @@ Status markers: **[W1]** created in Week 1 · *(Wn)* populated in that week.
 ├── scripts/                        [W2–W5] prepare_data, train_tokenizer, inspect_data, count_params,
 │                                   kaggle_validate, package_for_kaggle, train, evaluate,
 │                                   translate, average_checkpoints, report, kaggle_publish_runs,
-│                                   compare_runs, run_study, analyze_study
+│                                   compare_runs, run_study, analyze_study, pilot_report
 ├── dist/                           (gitignored) build output: dist/kaggle/ dataset bundles (ADR-016)
 │
 ├── src/
@@ -83,7 +83,8 @@ Status markers: **[W1]** created in Week 1 · *(Wn)* populated in that week.
 │       │                           [W7] paired bootstrap significance; [W8] statistics (multi-seed tests)
 │       ├── tracking/               [W5] loggers.py: stdout, jsonl (source of truth), TensorBoard, W&B
 │       ├── diagnostics/            [W5p/W6] Kaggle validation, packaging, kaggle_runs (persistence)
-│       └── study/                  [W8] config, plan (selection rules), runner, storage (slimming), analysis
+│       └── study/                  [W8] config, plan (selection rules), runner, storage (slimming), analysis;
+│                                   [W9] pilot (ADR-023 gates)
 │
 └── tests/                          [W1]
     ├── conftest.py                 [W2] synthetic corpora, tiny tokenizer config, CharTokenizer

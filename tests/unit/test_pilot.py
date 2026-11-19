@@ -8,11 +8,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from scripts.pilot_report import main as pilot_main
 
 from aiayn.study import StudyEnv, collect_states, load_study
 from aiayn.study.pilot import build_pilot_report, validation_report_summary, write_pilot_report
 from aiayn.study.plan import default_valid, main_run, sensitivity_variants, variant_run
-from scripts.pilot_report import main as pilot_main
 
 REPO = Path(__file__).resolve().parents[2]
 STUDY = REPO / "configs" / "study" / "week9_pilot.yaml"

@@ -240,10 +240,18 @@ A diverged run (for example at LR ×2) is recorded as `FAILED.json` and reported
 
 **Phase 1** (awaiting approval), in two committed sessions:
 1. **Validation (~15 min).** In `notebooks/kaggle_validate.ipynb`, keep the defaults: `DATA_CONFIG = configs/data/iwslt14.yaml` and the three IWSLT models. It downloads and checks the archive, builds the splits (the counts must match), trains the 10k tokenizer (the fingerprint must match `b0c6c22a…`), and measures T4 memory and throughput for the Transformer and both RNNs (gate G4).
-2. **Pilot (~10 short runs).** In `notebooks/kaggle_study.ipynb`, set `STUDY = "configs/study/week9_pilot.yaml"` (the default). Attach `aiayn-runs` and save with *Save & Run All (Commit)*. Then read `STUDY.md`:
-   - §4: learning-rate choices and any grid-edge flags (gate G3);
-   - §7: the Pre-LN arm (gate G2);
-   - §9: training health (gate G1).
+2. **Pilot (~10 short runs).** In `notebooks/kaggle_study.ipynb`, keep `STUDY = "configs/study/week9_pilot.yaml"` (the default). Add as inputs:
+   - the `aiayn-runs` dataset;
+   - **the validation notebook's output from step 1**, so `PILOT.md` includes its measurements.
+
+   Save with *Save & Run All (Commit)*. Cell 5b writes **`runs/PILOT.md`**, which is also copied into `iwslt14_pilot_transformer_s1/` and published. It contains:
+   - validation curves (also as `pilot_curves.csv`);
+   - throughput, peak memory and stability for each run;
+   - learning-rate selection with grid-edge flags;
+   - gates G1–G4 with their evidence;
+   - the Post-LN go/no-go decision and the Phase 2 recommendation.
+
+   The cell prints `pilot report exit: 0` for GO, `2` for NO-GO and `3` while runs are unfinished (run the notebook again with the newest `aiayn-runs` attached).
 
 **Phase 2** (after the gate): set `peak_lr` in `configs/experiment/iwslt14_*.yaml` from the pilot, then run the 3-seed benchmark study.
 

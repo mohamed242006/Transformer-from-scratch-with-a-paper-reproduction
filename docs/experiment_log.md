@@ -330,3 +330,19 @@ Week 8's config pins its old rules.
 **Local smoke test:** the real pipeline (data, pinned tokenizer, training) ran end to end on CPU with a shrunken model.
 
 **Not run:** any Kaggle job (awaiting approval for Phase 1).
+
+---
+
+## 2026-11-19 · Week 9 Phase 1: pilot tooling ready, Kaggle runs pending
+
+**Added:** `aiayn.study.pilot` + `scripts/pilot_report.py`, run by study-notebook cell 5b. They read the pilot runs and the Kaggle validation report and write `PILOT.md` / `PILOT.json` / `pilot_curves.csv`:
+- validation curves;
+- per-run throughput, peak memory, skipped fp16 steps and maximum gradient norm;
+- minutes per 1,000 updates and the projected Phase 2 hours;
+- learning-rate selection with grid-edge flags;
+- gates G1–G4 with their evidence;
+- the Post-LN go/no-go decision and the Phase 2 recommendation.
+
+**Local check (CPU):** the validator ran on the IWSLT14 config and every critical check passed: data counts, tokenizer fingerprint, exact parameter counts (36,663,296 / 36,565,136 / 36,606,112) and initial cross-entropy within its band. **Risk:** the CPU memory *estimate* for the worst-case batch (8,192 tokens of length 256) is 16,305 MiB for GRU + Bahdanau, above a T4's ~15,000 MiB; additive attention keeps a [B, T, S, 1104] tensor and grows with length squared. The Transformer (5,784) and BiLSTM + Luong (2,691) fit. The Kaggle validation step measures the real value before the pilot.
+
+**Results:** none yet. Phase 1 runs on Kaggle (owner), then results go here.

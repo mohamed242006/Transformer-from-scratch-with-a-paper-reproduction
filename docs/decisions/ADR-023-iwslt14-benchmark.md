@@ -129,6 +129,8 @@ These grids bracket each default from both sides; Week 8's optima all sat at the
 - **G3. Learning rate.** Per model, the variant with the best validation BLEU sets Phase 2's `peak_lr`. If the choice is flagged *at grid edge*, one more pilot run beyond the edge precedes Phase 2.
 - **G4. Budget.** Measured tokens/s from `kaggle_validate` (all three IWSLT models) and from the pilots fix the Phase 2 plan. RNN throughput at 36M parameters has not been measured yet.
 
+**Gate evaluation is automated:** `aiayn.study.pilot` and `scripts/pilot_report.py` produce `PILOT.md` and `PILOT.json` (gates, evidence, curves, throughput, memory, selections, recommendation); cell 5b of the study notebook runs them.
+
 **Phase 2** (after approval): `configs/experiment/iwslt14_{transformer,gru_bahdanau,bilstm_luong}.yaml` (30k updates). `peak_lr` is set from G3, 3 seeds each, with the §7 study rules.
 
 ## Consequences
@@ -169,3 +171,4 @@ These grids bracket each default from both sides; Week 8's optima all sat at the
   - the selection rules (valid BLEU, NLL tie-break, checkpoint, per-model variants, edge flags);
   - the ADR-023 rules end to end.
 - `tests/policy/test_layering.py`: `sacremoses` is allowed in `data` and `evaluation` only.
+- `tests/unit/test_pilot.py`: gate verdicts in GO, NO-GO and pending cases; the G2 margin; edge flags; Phase 2 time projection; validation-report parsing; script exit codes.

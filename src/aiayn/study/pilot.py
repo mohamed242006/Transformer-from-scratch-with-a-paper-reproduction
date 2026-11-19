@@ -235,7 +235,7 @@ def build_pilot_report(
     ]
     curves: list[dict[str, Any]] = []
     for step in steps:
-        row = {"update": step}
+        row: dict[str, Any] = {"update": step}
         cells = []
         for g, label in zip(pilot.logs, labels, strict=True):
             value = dict(g.valid).get(step)
@@ -276,8 +276,10 @@ def build_pilot_report(
         for model, e in summary.items():
             lines.append(
                 f"| {model} | {_f(e.get('parameters'), ',')} | "
-                f"{_f(e.get('peak_allocated_mib'), '.0f')} | {_f(e.get('peak_reserved_mib'), '.0f')} | "
-                f"{_f(e.get('device_total_mib'), '.0f')} | {_f(e.get('target_tokens_per_s'), ',.0f')} | "
+                f"{_f(e.get('peak_allocated_mib'), '.0f')} | "
+                f"{_f(e.get('peak_reserved_mib'), '.0f')} | "
+                f"{_f(e.get('device_total_mib'), '.0f')} | "
+                f"{_f(e.get('target_tokens_per_s'), ',.0f')} | "
                 f"{_f(e.get('ms_per_step'), '.1f')} |"
             )
 
@@ -294,7 +296,8 @@ def build_pilot_report(
             g3_ok = False
         candidates = [g for g in pilot.logs if g.model == model and g.variant != "pre_ln"]
         ranked = ", ".join(
-            f"{_lr_of(study, model, g.variant)}: BLEU {_f(g.valid_bleu, '.2f')} / NLL {_f(g.best_valid_nll)}"
+            f"{_lr_of(study, model, g.variant)}: BLEU {_f(g.valid_bleu, '.2f')} / "
+            f"NLL {_f(g.best_valid_nll)}"
             for g in candidates
         )
         selections[model] = {
@@ -376,7 +379,8 @@ def build_pilot_report(
         + {
             None: "PENDING",
             True: "**GO**: Phase 2 headline Transformer stays Post-LN.",
-            False: "**NO-GO**: Phase 2 headline Transformer switches to Pre-LN (ADR-023 amendment).",
+            False: "**NO-GO**: Phase 2 headline Transformer switches to Pre-LN "
+            "(ADR-023 amendment).",
         }[go],
     ]
 
@@ -389,7 +393,8 @@ def build_pilot_report(
         rec.append(f"- Transformer: `model.norm_position={norm}`.")
         for model, sel in selections.items():
             extra = (
-                " **First run one more pilot point beyond the grid edge**; the optimum is not bracketed."
+                " **First run one more pilot point beyond the grid edge**; "
+                "the optimum is not bracketed."
                 if sel["edges"]
                 else ""
             )
