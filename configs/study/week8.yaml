@@ -13,6 +13,10 @@ main_seeds: [1, 2, 3, 4, 5]
 bootstrap_samples: 1000
 default_beam: 4
 default_alpha: 0.6
+# Week 8 rules, pinned so its report stays reproducible (ADR-022). Later studies use
+# valid-BLEU selection and per-model checkpoint selection (ADR-023).
+training_selection: valid_nll
+select_checkpoint: false
 
 # Selected per model on VALID (mean BLEU over seeds 1-3), then reported on test.
 decoding:

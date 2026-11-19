@@ -51,7 +51,7 @@ The owner scoped Week 8 as multi-seed experiments, sensitivity studies, ablation
      - Corpus BLEU on every resample comes from sacreBLEU's own sufficient statistics, so it equals sacreBLEU exactly (tested).
      - It reports Δ = mean-over-seeds BLEU difference, a 95% percentile CI and a centred two-sided p-value. With B = 1000 samples the p floor is 1/1001 ("≤ 0.001").
    - **Holm-Bonferroni** correction is applied within each table, the family of comparisons.
-   - **Supplementary:** an exact seed permutation test. It measures training variance only, and its smallest attainable p depends on the seed counts (5 vs 5: 0.008; 3 vs 5: 0.036).
+   - **Supplementary:** an exact seed permutation test. It measures training variance only, and its smallest attainable p depends on the seed counts (5 vs 5: 2/252 ≈ 0.008; 3 vs 5: 1/56 ≈ 0.018 when the result is extreme in one direction, 2/56 ≈ 0.036 only in the symmetric case). *(Corrected 2026-11-18; the original text said 3 vs 5: 0.036.)*
    - **Diagnostics:** the Spearman correlation between valid NLL and test BLEU (it validates NLL-based selection), and the seed std compared with the test-sampling std.
 5. **Execution on Kaggle** (`notebooks/kaggle_study.ipynb`, `scripts/run_study.py`):
    - Work proceeds in priority order: main → decoding → decoding-selected → ablations → sensitivity → tuned. A session that runs out of time leaves the most important results complete.
@@ -106,3 +106,14 @@ The owner scoped Week 8 as multi-seed experiments, sensitivity studies, ablation
   - report sections;
   - the train command line;
   - slimming a really trained run leaves BLEU unchanged.
+
+## Outcome and amendments (2026-11-18)
+- **Executed:** 118/118 runs completed, none failed. Results are in [results.md](../results.md) §3–§5.
+- **Correction:** the minimum attainable permutation p for 3 vs 5 seeds is 1/56 ≈ 0.018. The original text said 0.036, which holds only for symmetric cases.
+- **Lessons adopted for later studies** (ADR-023, implemented in `aiayn.study`):
+  1. Training configs are selected by **validation BLEU**, with NLL only as a tie-breaker. Here, validation NLL picked dropout 0.2 over LR ×2 by 0.0002 nats, a coin flip.
+  2. The report **flags selections at a grid edge**: all four learning-rate selections were at the edge.
+  3. The checkpoint (best or averaged) is **selected per model on validation**, because averaging over a wide window hurt the RNNs by 0.4–1.7 BLEU.
+  4. **Outlier seeds** (silent collapse, as with BiLSTM + Luong seed 3) are flagged.
+  5. A training-health table (best-update position, final train vs best validation NLL) makes optimization failures such as `layers6` visible.
+- `configs/study/week8.yaml` pins the Week 8 rules (`training_selection: valid_nll`, `select_checkpoint: false`) so its report remains reproducible.
