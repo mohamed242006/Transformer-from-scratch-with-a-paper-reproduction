@@ -233,3 +233,20 @@ These grids bracket each default from both sides; Week 8's optima all sat at the
 - **Learning rates:** chosen per model at 30k updates, seed 1, on validation BLEU (averaged checkpoint, beam 4, α 0.6), with NLL as the tie-breaker.
 - **Grid edge:** an optimum at the edge of the grid gets one more point beyond it.
 - **Reuse:** the selected run becomes seed 1 of Phase 2.
+
+## Amendment 3 (2026-11-21): Phase 1c results and the frozen Phase 2 benchmark
+
+**Full-budget learning-rate selection** (30k updates, seed 1, validation BLEU of the averaged checkpoint at beam 4; owner's server):
+
+| Model | Candidates (peak LR → valid BLEU) | Selected |
+|---|---|---|
+| Transformer Pre-LN | 0.0007 → 34.33 · **0.001 → 34.67** · 0.0014 → 34.63 | 0.001 (interior) |
+| BiLSTM + Luong | 0.0028 → 33.21 · **0.0056 → 33.45** · 0.0112 → 33.01 | 0.0056 (interior) |
+| GRU + Bahdanau | 0.0028 → 29.82 (best checkpoint) | 0.0028 (chosen in the pilot) |
+
+**GRU instability:** at 0.0028 the GRU's averaged checkpoint degraded after its best validation point (late-training instability). Its benchmark result relies on the validation-selected checkpoint (§7). This is a caveat for any Transformer–GRU conclusion and is shown in the training-health table.
+
+**Frozen benchmark:**
+- `configs/experiment/iwslt14_{transformer,bilstm_luong,gru_bahdanau}.yaml` hold the final hyperparameters. They resolve to the same config hashes as the selected runs, which therefore serve as seed 1.
+- `configs/study/week9_benchmark.yaml`: 3 seeds, checkpoint selection, and a validation decoding grid (beam {4, 8} × α {0.6, 1.0}). Test evaluations cover the protocol defaults and the validation-selected setting.
+- No further tuning.

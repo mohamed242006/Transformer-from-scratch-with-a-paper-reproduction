@@ -441,3 +441,16 @@ Week 8's config pins its old rules.
 **Corrections to my earlier diagnosis:**
 - The fp16 and instability hypotheses were not supported by the logs (2 skipped updates, maximum gradient norm 2.95).
 - The 6k-update gate was biased against slow-starting architectures.
+
+---
+
+## 2026-11-21 · Week 9 Phase 1c: final learning rates · Phase 2 frozen
+
+**Selected at 30k updates** (validation BLEU, averaged checkpoint):
+- **Transformer Pre-LN 0.001:** 34.67 (vs 34.33 at 0.0007 and 34.63 at 0.0014).
+- **BiLSTM + Luong 0.0056:** 33.45 (vs 33.21 at 0.0028 and 33.01 at 0.0112).
+- **GRU + Bahdanau 0.0028:** 29.82 on the best checkpoint. Its averaged checkpoint collapsed after the best validation point: late-training instability, recorded as a caveat.
+
+**Gains from tuning:** Transformer +0.34 BLEU, inside the 0–1 range expected before the runs. BiLSTM + Luong +0.24 over 0.0028.
+
+**Phase 2:** `configs/study/week9_benchmark.yaml` (3 models × 3 seeds; the selected runs are seed 1, with identical config hashes). The hyperparameters are frozen.

@@ -1,5 +1,13 @@
-# Week 9 Phase 2 benchmark (ADR-023). peak_lr is set from the Phase 1 pilot before launch.
+# Week 9 Phase 2 benchmark (ADR-023): final, frozen hyperparameters.
+# Pre-LN is the headline Transformer (ADR-023 Amendment 2: Post-LN reached valid NLL
+# 3.034 / BLEU 5.79 vs Pre-LN 1.618 / 34.33 at 30k updates); the model config stays
+# paper-exact (Post-LN) and Pre-LN is set here as a declared deviation.
+# peak_lr 0.001 selected at the full 30k budget on validation BLEU (averaged checkpoint):
+# 0.0007 -> 34.33, 0.001 -> 34.67, 0.0014 -> 34.63.
 name: iwslt14_transformer
 data: iwslt14
 model: transformer_iwslt
 train: iwslt_t4
+overrides:
+  - model.norm_position=pre
+  - train.schedule.peak_lr=0.001

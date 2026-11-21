@@ -1,14 +1,19 @@
-# Week 9 Phase 2 benchmark (ADR-023). peak_lr is set from the Phase 1 pilot before launch.
-# RNNs: clip_norm 1.0, the one declared difference (ADR-021).
+# Week 9 Phase 2 benchmark (ADR-023): final, frozen hyperparameters.
+# RNNs: clip_norm 1.0, the declared difference (ADR-021).
+# peak_lr 0.0028: chosen in the 6k-update pilot (flat between 0.0014 and 0.0028) and
+# confirmed at 30k updates (valid BLEU 29.82, best checkpoint). At this rate the averaged
+# checkpoint degraded after the best validation point (late-training instability), so the
+# GRU relies on the per-model, validation-selected checkpoint (ADR-023 §7).
 name: iwslt14_gru_bahdanau
 data: iwslt14
 model: gru_bahdanau_iwslt
 train: iwslt_t4
 overrides:
   - train.clip_norm=1.0
-  # Memory-equivalent batching (ADR-023 §8): the worst-case 8,192-token batch does not
-  # fit a T4 (additive attention keeps a [B, T, S, 1104] tensor; Kaggle validation:
-  # CUDA OOM). Two 4,096-token micro-batches per update give the same effective update
-  # size, the same per-update token normalization and the same LR schedule.
+  - train.schedule.peak_lr=0.0028
+  # Memory-equivalent batching (ADR-023 Amendment 1): the worst-case 8,192-token batch
+  # does not fit a T4 (additive attention keeps a [B, T, S, 1104] tensor). Two
+  # 4,096-token micro-batches per update: same effective update size, per-update token
+  # normalization and LR schedule.
   - data.batching.max_tokens=4096
   - train.update_freq=2

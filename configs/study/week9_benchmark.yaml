@@ -1,0 +1,27 @@
+# Week 9 Phase 2: IWSLT'14 DE->EN benchmark (ADR-023). Final hyperparameters are frozen in
+# the experiment files; no tuning happens here. Seed 1 of each model is the run selected
+# in Phase 1c (renamed to <experiment>_s1), seeds 2-3 are trained by the runner.
+#
+# Per run (ADR-023 §7, selection on VALIDATION only):
+#   - test: averaged and best checkpoints at beam 4 (protocol), best greedy;
+#   - valid: averaged vs best checkpoint (beam 4) -> per-model checkpoint choice;
+#   - valid: small decoding grid on the chosen checkpoint -> per-model (beam, alpha);
+#   - test: the chosen checkpoint + decoding (headline, STUDY.md section 2).
+name: week9_iwslt14
+reference: transformer
+models:
+  transformer: configs/experiment/iwslt14_transformer.yaml
+  bilstm_luong: configs/experiment/iwslt14_bilstm_luong.yaml
+  gru_bahdanau: configs/experiment/iwslt14_gru_bahdanau.yaml
+main_seeds: [1, 2, 3]
+bootstrap_samples: 1000
+default_beam: 4
+default_alpha: 0.6
+training_selection: valid_bleu
+select_checkpoint: true
+
+decoding:
+  split: valid
+  seeds: [1, 2, 3]
+  beams: [4, 8]
+  length_penalties: [0.6, 1.0]
