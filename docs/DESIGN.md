@@ -110,9 +110,9 @@ CV bullets only with numbers that exist in `docs/results.md` with linked runs. M
 | 5 ✅ | Training system | Copy task 100%; Multi30k converges |
 | 6 ✅ | Inference + evaluation | First BLEU; beam=1 equals greedy |
 | 7 ✅ | Baselines (ADR-021) | All baselines through the same pipeline |
-| 8 | Multi30k study: multi-seed, sensitivity, ablations, statistics (ADR-022) | 5-seed comparison, Table-3-style ablations, significance, final experimental report |
-| 9 | IWSLT14 main benchmark (ADR-023; rescheduled from Week 8) | Headline table on IWSLT14, same study protocol |
-| 10 | Analysis and figures | §11.3 figures |
+| 8 ✅ | Multi30k study: multi-seed, sensitivity, ablations, statistics (ADR-022) | 5-seed comparison, Table-3-style ablations, significance, final experimental report |
+| 9 | IWSLT14 benchmark (ADR-023): Phase 0 ✅ data, metrics, incremental decoding · Phase 1 ✅ pilot + full-budget Post-LN test → **Pre-LN headline** (Amendment 2) · Phase 1c full-budget learning-rate selection · Phase 2 3-seed benchmark vs GRU and BiLSTM | Headline table on IWSLT14 (sacreBLEU + tok-lc BLEU), significance |
+| 10 | Analysis and figures, including the deep Post-LN investigation (ADR-023 Amendment 2, open item) | §11.3 figures; Post-LN result explained or bounded |
 | 11 | Documentation | Reproducible from a fresh clone |
 | 12+ | Extensions (WMT14 removed from scope, ADR-010) | |
 

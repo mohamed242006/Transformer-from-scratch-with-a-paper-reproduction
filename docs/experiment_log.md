@@ -416,3 +416,28 @@ Week 8's config pins its old rules.
 - **No retraining needed:** the completed Transformer pilot run is valid, since the bug was in decoding only.
 - **Earlier results are unaffected:** Week 6–8 results predate incremental decoding.
 - **Every GPU evaluation since Phase 0 would have crashed,** including `kaggle_train.ipynb`.
+
+---
+
+## 2026-11-21 · Week 9: Post-LN rejected at full budget; Pre-LN is the headline Transformer
+
+**Full-budget comparison** (owner's server, `iwslt14_transformer` recipe: 30k updates, warmup 4,000, 8,192 tokens; seed 1; validation only):
+
+| Run | Best valid NLL | Valid BLEU |
+|---|---|---|
+| `iwslt14_transformer-lr0.0005_s1` (Post-LN) | 3.034 | 5.79 |
+| `iwslt14_transformer-pre_ln_s1` (Pre-LN, 7e-4) | **1.618** | **34.33** |
+
+**Reading:**
+- Post-LN does not catch up: from 3.54 at 6k updates it only reaches 3.03 at 30k. The "just slower" hypothesis is rejected for this setup.
+- Pre-LN at 34.33 validation BLEU (sacreBLEU, cased) is in a sensible range for IWSLT'14 DE→EN.
+
+**Decision (ADR-023 Amendment 2):**
+- Pre-LN is the headline Transformer.
+- **Phase 1c** selects learning rates at the full budget for all three models.
+- Then the 3-seed Phase 2 benchmark.
+- The Post-LN discrepancy with published results is a Week 10 investigation item.
+
+**Corrections to my earlier diagnosis:**
+- The fp16 and instability hypotheses were not supported by the logs (2 skipped updates, maximum gradient norm 2.95).
+- The 6k-update gate was biased against slow-starting architectures.

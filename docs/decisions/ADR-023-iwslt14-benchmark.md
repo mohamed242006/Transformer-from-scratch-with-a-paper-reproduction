@@ -202,3 +202,34 @@ These grids bracket each default from both sides; Week 8's optima all sat at the
 - `compare_runs.py` and the study report now compare data configs with the micro-batch size factored out. They separately PASS or FAIL "same effective update size", listing which runs accumulate.
 
 **Fallback:** if the T4 re-validation at 4,096 still fails, use 2,048 × 4. The rules and checks are unchanged; only the two override values change.
+
+## Amendment 2 (2026-11-21): Pre-LN is the headline Transformer
+
+**Evidence:**
+- **Pilot (6k updates).** Post-LN validation NLL fell steadily from 5.52 to 3.54. It was stable: 2 skipped fp16 updates, maximum gradient norm 2.95, training NLL ≈ validation NLL. It was about 3× slower than Pre-LN in updates to reach the same NLL.
+- **Full-budget test (30k updates, Phase 2 recipe, seed 1):**
+
+  | Run | Best valid NLL | Valid BLEU (averaged, beam 4) |
+  |---|---|---|
+  | Post-LN, peak LR 5e-4 | 3.034 | 5.79 |
+  | Pre-LN, peak LR 7e-4 | **1.618** | **34.33** |
+
+**Decision:**
+- The full-budget gate (Post-LN NLL within +0.05 and BLEU within −0.5 of Pre-LN) fails by a wide margin. **Pre-LN (`model.norm_position=pre`) is the headline Transformer for Phase 2.**
+- The model config stays paper-exact (`transformer_iwslt.yaml`, Post-LN); the Phase 2 experiment sets Pre-LN as an override.
+- **This is a declared deviation from the paper's architecture.**
+
+**Gate lesson:** the original G2 compared architectures at 6k updates, which is biased against slow starters. Architecture decisions are now made at the full training budget.
+
+**Open item, not a blocker (Week 10):** the result conflicts with published training of 6+6 Post-LN on IWSLT'14, e.g. fairseq's `transformer_iwslt_de_en` recipe.
+- **Ruled out by the logs:** mixed precision (fp16) and instability.
+- **Unlikely, from the parity tests:** an architecture bug, since the stacks match PyTorch's reference Transformer forward and backward.
+- **Remaining candidates:** recipe differences from fairseq (Adam ε 1e-9 vs 1e-8; weight decay 0 vs 1e-4; Q/K/V Xavier gain 1 vs 1/√2; 8,192 vs 4,096 tokens per batch; three-way vs decoder-only weight tying).
+- **Planned investigation:** per-layer gradient norms at initialization (CPU), then one-factor Post-LN runs.
+- Multi30k 3+3 Post-LN trained well (better than Pre-LN by 1.1 BLEU), so the effect is depth-related.
+
+**Phase 1c, full-budget learning-rate selection:**
+- **Why full budget:** the 6k pilot proved misleading for the architecture choice, and on the owner's server a 30k-update run costs 0.3–0.9 h.
+- **Learning rates:** chosen per model at 30k updates, seed 1, on validation BLEU (averaged checkpoint, beam 4, α 0.6), with NLL as the tie-breaker.
+- **Grid edge:** an optimum at the edge of the grid gets one more point beyond it.
+- **Reuse:** the selected run becomes seed 1 of Phase 2.
