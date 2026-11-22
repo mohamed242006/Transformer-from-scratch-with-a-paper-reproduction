@@ -1,0 +1,570 @@
+{
+  "runs": [
+    {
+      "name": "iwslt14_pilot_transformer_s1",
+      "model": "transformer",
+      "variant": "default",
+      "completed": true,
+      "failed": false,
+      "valid": [
+        [
+          1000,
+          5.5210680898706395
+        ],
+        [
+          2000,
+          4.647126390280945
+        ],
+        [
+          3000,
+          4.160629151784889
+        ],
+        [
+          4000,
+          3.912286244007942
+        ],
+        [
+          5000,
+          3.6938317092769513
+        ],
+        [
+          6000,
+          3.536762136239794
+        ]
+      ],
+      "valid_bleu": 3.82,
+      "best_valid_nll": 3.536762136239794,
+      "final_train_nll": 3.626580824883708,
+      "tokens_per_s": 112541.5,
+      "peak_mib": 4558.0,
+      "skipped": 2,
+      "updates": 6000,
+      "max_grad_norm": 2.9544575214385986,
+      "wall_minutes": 6.383333333333334,
+      "batching": "8192 x 1",
+      "minutes_per_1k": 1.0638888888888889
+    },
+    {
+      "name": "iwslt14_pilot_transformer-lr0.0005_s1",
+      "model": "transformer",
+      "variant": "lr0.0005",
+      "completed": true,
+      "failed": false,
+      "valid": [
+        [
+          1000,
+          5.656965134809344
+        ],
+        [
+          2000,
+          4.770971458746342
+        ],
+        [
+          3000,
+          4.250124408058266
+        ],
+        [
+          4000,
+          3.9475602480356384
+        ],
+        [
+          5000,
+          3.6873862107891227
+        ],
+        [
+          6000,
+          3.5111723817329965
+        ]
+      ],
+      "valid_bleu": 4.32,
+      "best_valid_nll": 3.5111723817329965,
+      "final_train_nll": 3.6211886001632716,
+      "tokens_per_s": 112439.5,
+      "peak_mib": 4558.0,
+      "skipped": 2,
+      "updates": 6000,
+      "max_grad_norm": 2.8622400760650635,
+      "wall_minutes": 6.4,
+      "batching": "8192 x 1",
+      "minutes_per_1k": 1.0666666666666667
+    },
+    {
+      "name": "iwslt14_pilot_transformer-lr0.001_s1",
+      "model": "transformer",
+      "variant": "lr0.001",
+      "completed": true,
+      "failed": false,
+      "valid": [
+        [
+          1000,
+          5.444633897224354
+        ],
+        [
+          2000,
+          4.612156938098216
+        ],
+        [
+          3000,
+          4.174285075942468
+        ],
+        [
+          4000,
+          3.978380278226235
+        ],
+        [
+          5000,
+          3.785591900047943
+        ],
+        [
+          6000,
+          3.660433453121533
+        ]
+      ],
+      "valid_bleu": 2.95,
+      "best_valid_nll": 3.660433453121533,
+      "final_train_nll": 3.75612605617031,
+      "tokens_per_s": 112499.0,
+      "peak_mib": 4558.0,
+      "skipped": 2,
+      "updates": 6000,
+      "max_grad_norm": 2.5292038917541504,
+      "wall_minutes": 6.383333333333334,
+      "batching": "8192 x 1",
+      "minutes_per_1k": 1.0638888888888889
+    },
+    {
+      "name": "iwslt14_pilot_transformer-pre_ln_s1",
+      "model": "transformer",
+      "variant": "pre_ln",
+      "completed": true,
+      "failed": false,
+      "valid": [
+        [
+          1000,
+          4.728047178152422
+        ],
+        [
+          2000,
+          3.4193281404568525
+        ],
+        [
+          3000,
+          2.677821500366342
+        ],
+        [
+          4000,
+          2.302733035552288
+        ],
+        [
+          5000,
+          2.0998873365185045
+        ],
+        [
+          6000,
+          1.9326426931124265
+        ]
+      ],
+      "valid_bleu": 27.05,
+      "best_valid_nll": 1.9326426931124265,
+      "final_train_nll": 1.9760462990374346,
+      "tokens_per_s": 110847.0,
+      "peak_mib": 4621.0,
+      "skipped": 1,
+      "updates": 6000,
+      "max_grad_norm": 1.9229642152786255,
+      "wall_minutes": 6.483333333333333,
+      "batching": "8192 x 1",
+      "minutes_per_1k": 1.0805555555555555
+    },
+    {
+      "name": "iwslt14_pilot_gru_bahdanau_s1",
+      "model": "gru_bahdanau",
+      "variant": "default",
+      "completed": true,
+      "failed": false,
+      "valid": [
+        [
+          1000,
+          4.89427522653266
+        ],
+        [
+          2000,
+          3.490179780736395
+        ],
+        [
+          3000,
+          2.719104139785707
+        ],
+        [
+          4000,
+          2.3811040005863284
+        ],
+        [
+          5000,
+          2.2022356344497296
+        ],
+        [
+          6000,
+          2.1230400494272588
+        ]
+      ],
+      "valid_bleu": 26.62,
+      "best_valid_nll": 2.1230400494272588,
+      "final_train_nll": 2.1837348017646407,
+      "tokens_per_s": 70303.5,
+      "peak_mib": 8622.0,
+      "skipped": 1,
+      "updates": 6000,
+      "max_grad_norm": 3.044814109802246,
+      "wall_minutes": 10.516666666666667,
+      "batching": "4096 x 2",
+      "minutes_per_1k": 1.752777777777778
+    },
+    {
+      "name": "iwslt14_pilot_gru_bahdanau-lr0.0014_s1",
+      "model": "gru_bahdanau",
+      "variant": "lr0.0014",
+      "completed": true,
+      "failed": false,
+      "valid": [
+        [
+          1000,
+          4.371419788469361
+        ],
+        [
+          2000,
+          2.8200925693926004
+        ],
+        [
+          3000,
+          2.5191401854393063
+        ],
+        [
+          4000,
+          2.2027530707751324
+        ],
+        [
+          5000,
+          2.0894916603367175
+        ],
+        [
+          6000,
+          2.0284245359776505
+        ]
+      ],
+      "valid_bleu": 28.52,
+      "best_valid_nll": 2.0284245359776505,
+      "final_train_nll": 2.048683073289995,
+      "tokens_per_s": 70494.0,
+      "peak_mib": 8622.0,
+      "skipped": 1,
+      "updates": 6000,
+      "max_grad_norm": 2.9997751712799072,
+      "wall_minutes": 10.5,
+      "batching": "4096 x 2",
+      "minutes_per_1k": 1.75
+    },
+    {
+      "name": "iwslt14_pilot_gru_bahdanau-lr0.0028_s1",
+      "model": "gru_bahdanau",
+      "variant": "lr0.0028",
+      "completed": true,
+      "failed": false,
+      "valid": [
+        [
+          1000,
+          3.6088647755396734
+        ],
+        [
+          2000,
+          2.487769783471164
+        ],
+        [
+          3000,
+          2.3059444681720085
+        ],
+        [
+          4000,
+          2.2346089151637956
+        ],
+        [
+          5000,
+          2.1270350886236904
+        ],
+        [
+          6000,
+          2.076127223733421
+        ]
+      ],
+      "valid_bleu": 28.62,
+      "best_valid_nll": 2.076127223733421,
+      "final_train_nll": 2.2253289222186408,
+      "tokens_per_s": 70506.0,
+      "peak_mib": 8622.0,
+      "skipped": 1,
+      "updates": 6000,
+      "max_grad_norm": 2.0534377098083496,
+      "wall_minutes": 10.516666666666667,
+      "batching": "4096 x 2",
+      "minutes_per_1k": 1.752777777777778
+    },
+    {
+      "name": "iwslt14_pilot_bilstm_luong_s1",
+      "model": "bilstm_luong",
+      "variant": "default",
+      "completed": true,
+      "failed": false,
+      "valid": [
+        [
+          1000,
+          5.237035652623398
+        ],
+        [
+          2000,
+          3.800017245018477
+        ],
+        [
+          3000,
+          2.882196306330219
+        ],
+        [
+          4000,
+          2.5005590688366905
+        ],
+        [
+          5000,
+          2.26019019445546
+        ],
+        [
+          6000,
+          2.1360844257414007
+        ]
+      ],
+      "valid_bleu": 26.09,
+      "best_valid_nll": 2.1360844257414007,
+      "final_train_nll": 2.245713470049349,
+      "tokens_per_s": 187799.0,
+      "peak_mib": 2143.0,
+      "skipped": 1,
+      "updates": 6000,
+      "max_grad_norm": 1.455606460571289,
+      "wall_minutes": 3.85,
+      "batching": "8192 x 1",
+      "minutes_per_1k": 0.6416666666666667
+    },
+    {
+      "name": "iwslt14_pilot_bilstm_luong-lr0.0014_s1",
+      "model": "bilstm_luong",
+      "variant": "lr0.0014",
+      "completed": true,
+      "failed": false,
+      "valid": [
+        [
+          1000,
+          4.526646941827671
+        ],
+        [
+          2000,
+          3.026820604415765
+        ],
+        [
+          3000,
+          2.481784100551098
+        ],
+        [
+          4000,
+          2.2488210299899674
+        ],
+        [
+          5000,
+          2.0520347924877305
+        ],
+        [
+          6000,
+          1.956949577869023
+        ]
+      ],
+      "valid_bleu": 28.75,
+      "best_valid_nll": 1.956949577869023,
+      "final_train_nll": 1.9931392959439989,
+      "tokens_per_s": 187897.5,
+      "peak_mib": 2143.0,
+      "skipped": 1,
+      "updates": 6000,
+      "max_grad_norm": 1.5470532178878784,
+      "wall_minutes": 3.85,
+      "batching": "8192 x 1",
+      "minutes_per_1k": 0.6416666666666667
+    },
+    {
+      "name": "iwslt14_pilot_bilstm_luong-lr0.0028_s1",
+      "model": "bilstm_luong",
+      "variant": "lr0.0028",
+      "completed": true,
+      "failed": false,
+      "valid": [
+        [
+          1000,
+          3.8813564913167573
+        ],
+        [
+          2000,
+          2.6071471199013434
+        ],
+        [
+          3000,
+          2.2342552416374506
+        ],
+        [
+          4000,
+          2.091683977034543
+        ],
+        [
+          5000,
+          1.9557222729499797
+        ],
+        [
+          6000,
+          1.8739134776779112
+        ]
+      ],
+      "valid_bleu": 30.45,
+      "best_valid_nll": 1.8739134776779112,
+      "final_train_nll": 1.8723720764076295,
+      "tokens_per_s": 187875.0,
+      "peak_mib": 2143.0,
+      "skipped": 1,
+      "updates": 6000,
+      "max_grad_norm": 1.3522447347640991,
+      "wall_minutes": 3.8666666666666667,
+      "batching": "8192 x 1",
+      "minutes_per_1k": 0.6444444444444445
+    }
+  ],
+  "curves": [
+    {
+      "update": 1000,
+      "transformer:default": 5.5210680898706395,
+      "transformer:lr0.0005": 5.656965134809344,
+      "transformer:lr0.001": 5.444633897224354,
+      "transformer:pre_ln": 4.728047178152422,
+      "gru_bahdanau:default": 4.89427522653266,
+      "gru_bahdanau:lr0.0014": 4.371419788469361,
+      "gru_bahdanau:lr0.0028": 3.6088647755396734,
+      "bilstm_luong:default": 5.237035652623398,
+      "bilstm_luong:lr0.0014": 4.526646941827671,
+      "bilstm_luong:lr0.0028": 3.8813564913167573
+    },
+    {
+      "update": 2000,
+      "transformer:default": 4.647126390280945,
+      "transformer:lr0.0005": 4.770971458746342,
+      "transformer:lr0.001": 4.612156938098216,
+      "transformer:pre_ln": 3.4193281404568525,
+      "gru_bahdanau:default": 3.490179780736395,
+      "gru_bahdanau:lr0.0014": 2.8200925693926004,
+      "gru_bahdanau:lr0.0028": 2.487769783471164,
+      "bilstm_luong:default": 3.800017245018477,
+      "bilstm_luong:lr0.0014": 3.026820604415765,
+      "bilstm_luong:lr0.0028": 2.6071471199013434
+    },
+    {
+      "update": 3000,
+      "transformer:default": 4.160629151784889,
+      "transformer:lr0.0005": 4.250124408058266,
+      "transformer:lr0.001": 4.174285075942468,
+      "transformer:pre_ln": 2.677821500366342,
+      "gru_bahdanau:default": 2.719104139785707,
+      "gru_bahdanau:lr0.0014": 2.5191401854393063,
+      "gru_bahdanau:lr0.0028": 2.3059444681720085,
+      "bilstm_luong:default": 2.882196306330219,
+      "bilstm_luong:lr0.0014": 2.481784100551098,
+      "bilstm_luong:lr0.0028": 2.2342552416374506
+    },
+    {
+      "update": 4000,
+      "transformer:default": 3.912286244007942,
+      "transformer:lr0.0005": 3.9475602480356384,
+      "transformer:lr0.001": 3.978380278226235,
+      "transformer:pre_ln": 2.302733035552288,
+      "gru_bahdanau:default": 2.3811040005863284,
+      "gru_bahdanau:lr0.0014": 2.2027530707751324,
+      "gru_bahdanau:lr0.0028": 2.2346089151637956,
+      "bilstm_luong:default": 2.5005590688366905,
+      "bilstm_luong:lr0.0014": 2.2488210299899674,
+      "bilstm_luong:lr0.0028": 2.091683977034543
+    },
+    {
+      "update": 5000,
+      "transformer:default": 3.6938317092769513,
+      "transformer:lr0.0005": 3.6873862107891227,
+      "transformer:lr0.001": 3.785591900047943,
+      "transformer:pre_ln": 2.0998873365185045,
+      "gru_bahdanau:default": 2.2022356344497296,
+      "gru_bahdanau:lr0.0014": 2.0894916603367175,
+      "gru_bahdanau:lr0.0028": 2.1270350886236904,
+      "bilstm_luong:default": 2.26019019445546,
+      "bilstm_luong:lr0.0014": 2.0520347924877305,
+      "bilstm_luong:lr0.0028": 1.9557222729499797
+    },
+    {
+      "update": 6000,
+      "transformer:default": 3.536762136239794,
+      "transformer:lr0.0005": 3.5111723817329965,
+      "transformer:lr0.001": 3.660433453121533,
+      "transformer:pre_ln": 1.9326426931124265,
+      "gru_bahdanau:default": 2.1230400494272588,
+      "gru_bahdanau:lr0.0014": 2.0284245359776505,
+      "gru_bahdanau:lr0.0028": 2.076127223733421,
+      "bilstm_luong:default": 2.1360844257414007,
+      "bilstm_luong:lr0.0014": 1.956949577869023,
+      "bilstm_luong:lr0.0028": 1.8739134776779112
+    }
+  ],
+  "selection": {
+    "transformer": {
+      "variant": "lr0.0005",
+      "peak_lr": "0.0005",
+      "edges": [
+        "train.schedule.peak_lr at grid minimum"
+      ]
+    },
+    "gru_bahdanau": {
+      "variant": "lr0.0028",
+      "peak_lr": "0.0028",
+      "edges": [
+        "train.schedule.peak_lr at grid maximum"
+      ]
+    },
+    "bilstm_luong": {
+      "variant": "lr0.0028",
+      "peak_lr": "0.0028",
+      "edges": [
+        "train.schedule.peak_lr at grid maximum"
+      ]
+    }
+  },
+  "gates": {
+    "G1": {
+      "ok": true,
+      "evidence": "completed=True, best at last evaluation=True, decreasing over last 3=True (3.912, 3.694, 3.537), skipped 2/6000"
+    },
+    "G2": {
+      "ok": false,
+      "evidence": "best valid NLL Post 3.537 vs Pre 1.933 (limit +0.05); valid BLEU Post 3.82 vs Pre 27.05 (limit -0.5)"
+    },
+    "G3": {
+      "ok": false
+    },
+    "G4": {
+      "ok": true,
+      "evidence": "transformer 0.5 h/run, gru_bahdanau 0.9 h/run, bilstm_luong 0.3 h/run; total 5.2 h for 3 seeds (~0.2 weekly quotas of 30 h)",
+      "projected_hours": {
+        "transformer": 0.5333333333333333,
+        "gru_bahdanau": 0.876388888888889,
+        "bilstm_luong": 0.32222222222222224
+      }
+    },
+    "post_ln_go": false
+  }
+}

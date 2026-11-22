@@ -454,3 +454,54 @@ Week 8's config pins its old rules.
 **Gains from tuning:** Transformer +0.34 BLEU, inside the 0–1 range expected before the runs. BiLSTM + Luong +0.24 over 0.0028.
 
 **Phase 2:** `configs/study/week9_benchmark.yaml` (3 models × 3 seeds; the selected runs are seed 1, with identical config hashes). The hyperparameters are frozen.
+
+---
+
+## 2026-11-22 · Week 9 Phase 2 complete · v1.0 closure
+
+**Done**
+- **Ran the frozen benchmark** (`configs/study/week9_benchmark.yaml`) on the owner's server (RTX 5070 Ti):
+  - 3 models × 3 seeds; 6 new training runs, the 3 seed-1 runs reused from Phase 1c;
+  - 75 evaluations;
+  - 9 completed, 0 failed, 0 tasks pending.
+- **Archived the evidence** in `experiments/2026-11-22_iwslt14-week9-benchmark/`:
+  - STUDY and PILOT reports;
+  - config, metadata, metrics and evaluation JSONs for all 24 IWSLT runs;
+  - gzipped test hypotheses for the 9 benchmark runs.
+  - Re-scoring an archived hypothesis file reproduces the logged BLEU exactly: 32.99 for `iwslt14_transformer_s1`, averaged checkpoint, beam 4.
+
+**Findings** (test BLEU, mean ± std over 3 seeds)
+
+| Model | Protocol defaults | Valid-selected checkpoint and decoding | tok-lc BLEU (selected) |
+|---|---|---|---|
+| Transformer, Pre-LN 6+6 | **32.95 ± 0.05** | **33.10 ± 0.07** | 34.84 |
+| BiLSTM + Luong | 31.80 ± 0.19 | 32.04 ± 0.10 | 33.83 |
+| GRU + Bahdanau | 11.51 ± 14.37 | 28.88 ± 0.25 | 30.78 |
+
+- **The Transformer leads the best RNN by about 1.1 BLEU** (Δ −1.06, 95% CI [−1.33, −0.82], Holm p = 0.002). That is much less than the 2.7–4.3 seen on Multi30k at a shared learning rate.
+- **Seed noise is small** for the Transformer (std 0.05) and the BiLSTM (0.10–0.19). The seed permutation test sits at its 3-vs-3 floor (p = 0.100), so only the bootstrap can show significance.
+- **GRU + Bahdanau diverged late in 2 of 3 seeds:**
+  - final training NLL 15.8 and 17.0;
+  - best validation at updates 13–14k;
+  - only 23–36 skipped fp16 updates per run, so this isn't an fp16 overflow story.
+
+  The averaged checkpoint (last 5 snapshots) therefore scores 0.06 / 27.63 / 6.84. The validation-selected best checkpoint gives 28.88 ± 0.25.
+- **Every model's validation-selected decoding is at the grid corner** (beam 8, α 1.0), so section 2 of STUDY.md is a lower bound on what tuned decoding gives. The gain over the protocol default is small: +0.15 (Transformer) and +0.24 (BiLSTM).
+- **The BiLSTM peaks early** (best validation at 47% of training, "early best"). Averaging still helps it: +0.73 BLEU over the best checkpoint.
+- **BLEU falls with source length for every model,** and the Transformer–BiLSTM gap stays roughly constant across buckets (0.9–1.4 BLEU).
+- **Validation NLL vs test BLEU over the 9 runs:** Spearman ρ = −0.817.
+
+**Decisions** (ADR-023 Amendment 4)
+- The benchmark is complete and frozen for v1.0. No further training runs.
+- **Post-LN is closed as a bounded result:**
+  - it fails at 30k updates for peak LRs 5e-4 to 1e-3;
+  - not fp16, not too few updates, and an implementation fault is unlikely;
+  - the cause most likely lies in untested recipe or initialization differences from fairseq.
+- **Deferred to future work:**
+  - the deep Post-LN investigation;
+  - the cause of the GRU's late divergence;
+  - the DESIGN.md §11.3 figure set.
+
+**Next steps**
+- Week 11: final documentation (results.md, README), report outline and presentation outline.
+- Before tagging v1.0, publish the 9 benchmark run directories (checkpoints included) to the private `aiayn-runs` dataset (ADR-020).

@@ -1,6 +1,6 @@
 # ADR-023: IWSLT'14 DE→EN benchmark: data, evaluation protocols, incremental decoding, study rules and pilot gate
 
-- **Status:** Accepted (Phase 0 implemented 2026-11-19; Phases 1–2 pending approval)
+- **Status:** Accepted (Phase 0 implemented 2026-11-19; Phases 1–2 completed 2026-11-22; benchmark closed by Amendment 4)
 - **Date:** 2026-11-19
 - **Deciders:** Lead engineer, project owner
 - **Related:** [ADR-002](ADR-002-iwslt14-before-wmt14.md), [ADR-005](ADR-005-sentencepiece-tokenization.md), [ADR-006](ADR-006-evaluation-protocol.md), [ADR-019](ADR-019-decoding-and-evaluation.md), [ADR-021](ADR-021-rnn-baselines-and-fair-comparison.md), [ADR-022](ADR-022-multi-seed-study-and-statistics.md), [results.md](../results.md)
@@ -250,3 +250,57 @@ These grids bracket each default from both sides; Week 8's optima all sat at the
 - `configs/experiment/iwslt14_{transformer,bilstm_luong,gru_bahdanau}.yaml` hold the final hyperparameters. They resolve to the same config hashes as the selected runs, which therefore serve as seed 1.
 - `configs/study/week9_benchmark.yaml`: 3 seeds, checkpoint selection, and a validation decoding grid (beam {4, 8} × α {0.6, 1.0}). Test evaluations cover the protocol defaults and the validation-selected setting.
 - No further tuning.
+
+## Amendment 4 (2026-11-22): Benchmark complete; Post-LN result bounded and deferred to future work
+
+**Phase 2 outcome:** 9 runs completed, none failed (`experiments/2026-11-22_iwslt14-week9-benchmark/`). Test BLEU, mean ± std over seeds 1–3:
+
+| Model | Protocol defaults (averaged, beam 4, α 0.6) | Validation-selected checkpoint and decoding |
+|---|---|---|
+| Transformer, Pre-LN 6+6 | **32.95 ± 0.05** | **33.10 ± 0.07** (averaged, beam 8, α 1.0) |
+| BiLSTM + Luong | 31.80 ± 0.19 | 32.04 ± 0.10 (averaged, beam 8, α 1.0) |
+| GRU + Bahdanau | 11.51 ± 14.37 | 28.88 ± 0.25 (best, beam 8, α 1.0) |
+
+Every gap to the Transformer is significant (two-level paired bootstrap, Holm p = 0.002). The full analysis is in [results.md §1–2](../results.md).
+
+**GRU + Bahdanau, final caveat (replaces the Amendment 3 note):**
+- **Training diverged late in 2 of 3 seeds.** Training NLL rose above 3 after update ~22,800 (seed 1) and ~27,600 (seed 3), ending at 15.8 and 17.0. Seed 2 drifted: valid NLL went from 1.94 to 2.03.
+- **The best validation points were at updates 13–14k.** The averaging window (the last 5 of 30 snapshots) falls after the divergence, so the averaged checkpoint scores 0.06 / 27.63 / 6.84 on test.
+- **The study's checkpoint rule handled it:** the best checkpoint was chosen on validation (§7.2), and gives 28.88 ± 0.25. The protocol-defaults row is reported unchanged, as a finding.
+- **Not caused by fp16:** only 23–36 updates were skipped per run.
+- **The cause was not investigated.** It is listed as future work, with the learning rate 2.8e-3 as a likely factor.
+
+**Post-LN: bounded result.** The paper's Post-LN 6+6 Transformer (d = 512, 4 heads, d_ff = 1,024, dropout 0.3) did not train to a competitive model with this recipe.
+
+| Evidence | Post-LN | Pre-LN |
+|---|---|---|
+| 6k-update pilot, peak LR 5e-4 / 7e-4 / 1e-3: best valid NLL | 3.51 / 3.54 / 3.66 | 1.93 (7e-4) |
+| 30k updates (Phase 2 recipe): best valid NLL | 3.034 (LR 5e-4; best at 22k) | 1.618 (LR 7e-4) |
+| 30k updates: valid BLEU (averaged, beam 4) | 5.79 | 34.33 |
+
+What the evidence supports:
+- **Not a learning-rate choice** within 5e-4 to 1e-3: all three pilot learning rates fail alike, and the lowest is the least bad.
+- **Not too few updates:** five times the pilot budget improves NLL only from 3.54 to 3.03, and the best point (22k) comes before the end.
+- **Not fp16 or divergence:** 2 skipped updates, maximum gradient norm 2.95, training NLL ≈ validation NLL (Amendment 2).
+- **Unlikely an implementation fault.** The same code trains 3+3 Post-LN to 36.71 BLEU on Multi30k, 1.09 above Pre-LN there (results.md §6). The stacks are parity-tested against PyTorch's reference Transformer, forward and backward (ADR-004). Pre-LN 6+6 trains through the same modules.
+- **Depth-related:** the Multi30k 6+6 Post-LN ablation also failed (results.md §6, `layers6`), though at a short schedule.
+
+**Bound:** in this implementation and recipe, 6+6 Post-LN does not reach a usable model within 30k updates at peak learning rates from 5e-4 to 1e-3. This contradicts published Post-LN training on IWSLT'14 (fairseq `transformer_iwslt_de_en`). The cause is therefore most likely one or more recipe or initialization differences from that setup, none of them tested:
+- Adam ε 1e-9 vs 1e-8;
+- weight decay 0 vs 1e-4;
+- Q/K/V Xavier gain 1 vs 1/√2;
+- 8,192 vs 4,096 tokens per update;
+- three-way weight tying with √d embedding scaling vs decoder-only tying.
+
+**Decision:**
+1. **The IWSLT'14 benchmark is complete and frozen for v1.0.** No further training runs or tuning.
+2. **The Post-LN investigation is future work.** The planned steps are unchanged: per-layer gradient norms at initialization on CPU, then one-factor Post-LN runs over the candidates above. The Week 10 roadmap item ("Post-LN result explained or bounded", DESIGN.md §13) is met by this bound.
+3. **The DESIGN.md §11.3 figure set is also deferred to after v1.0.** Results are reported as tables from the archived evaluations.
+4. **Scope of the faithfulness claims:**
+   - ADR-003's Post-LN default stays the paper-faithful configuration, and it is what the Multi30k results use.
+   - The IWSLT'14 headline Transformer is a **declared Pre-LN deviation**.
+   - The README and results.md state this wherever the headline number appears.
+
+**Consequences:**
+- The project's main comparison is Pre-LN Transformer vs attention RNNs. It does not support claims about the paper's exact architecture at 6+6 depth.
+- The GRU baseline's protocol-defaults number reflects training instability, not model capacity. Conclusions about the GRU use the validation-selected row.

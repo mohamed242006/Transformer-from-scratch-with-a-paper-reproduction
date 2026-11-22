@@ -1,0 +1,601 @@
+{
+  "main": [
+    {
+      "label": "transformer",
+      "tag": "test.averaged.beam4",
+      "seeds": 3,
+      "runs": [
+        "iwslt14_transformer_s1",
+        "iwslt14_transformer_s2",
+        "iwslt14_transformer_s3"
+      ],
+      "bleu": [
+        32.99,
+        32.9,
+        32.96
+      ],
+      "chrf": [
+        56.5,
+        56.63,
+        56.61
+      ],
+      "bleu_fairseq": [
+        34.72,
+        34.62,
+        34.68
+      ],
+      "length_ratio": [
+        0.9535,
+        0.9522,
+        0.9571
+      ],
+      "valid_nll": [
+        1.601766274043351,
+        1.5999870779732381,
+        1.5978657919876629
+      ],
+      "test": null,
+      "p_holm": null
+    },
+    {
+      "label": "bilstm_luong",
+      "tag": "test.averaged.beam4",
+      "seeds": 3,
+      "runs": [
+        "iwslt14_bilstm_luong_s1",
+        "iwslt14_bilstm_luong_s2",
+        "iwslt14_bilstm_luong_s3"
+      ],
+      "bleu": [
+        31.63,
+        31.76,
+        32.0
+      ],
+      "chrf": [
+        55.45,
+        55.48,
+        55.66
+      ],
+      "bleu_fairseq": [
+        33.42,
+        33.52,
+        33.77
+      ],
+      "length_ratio": [
+        0.9611,
+        0.9606,
+        0.9639
+      ],
+      "valid_nll": [
+        1.7280663057495034,
+        1.728747793142201,
+        1.7325463069193952
+      ],
+      "test": {
+        "delta": -1.1546134561489758,
+        "ci": [
+          -1.4739558664146832,
+          -0.8657176596154826
+        ],
+        "p_bootstrap": 0.000999000999000999,
+        "p_permutation": 0.1
+      },
+      "p_holm": 0.001998001998001998
+    },
+    {
+      "label": "gru_bahdanau",
+      "tag": "test.averaged.beam4",
+      "seeds": 3,
+      "runs": [
+        "iwslt14_gru_bahdanau_s1",
+        "iwslt14_gru_bahdanau_s2",
+        "iwslt14_gru_bahdanau_s3"
+      ],
+      "bleu": [
+        0.06,
+        27.63,
+        6.84
+      ],
+      "chrf": [
+        9.26,
+        52.57,
+        26.71
+      ],
+      "bleu_fairseq": [
+        0.06,
+        29.26,
+        7.87
+      ],
+      "length_ratio": [
+        3.5433,
+        0.9189,
+        1.33
+      ],
+      "valid_nll": [
+        1.927997175028033,
+        1.932045425832367,
+        1.931466415540621
+      ],
+      "test": {
+        "delta": -21.44553353866759,
+        "ci": [
+          -32.636089062845485,
+          -5.381516149119937
+        ],
+        "p_bootstrap": 0.000999000999000999,
+        "p_permutation": 0.1
+      },
+      "p_holm": 0.001998001998001998
+    }
+  ],
+  "decoding_selection": {
+    "transformer": [
+      8,
+      1.0
+    ],
+    "bilstm_luong": [
+      8,
+      1.0
+    ],
+    "gru_bahdanau": [
+      8,
+      1.0
+    ]
+  },
+  "checkpoint_selection": {
+    "transformer": "averaged",
+    "bilstm_luong": "averaged",
+    "gru_bahdanau": "best"
+  },
+  "decoding_selected": [
+    {
+      "label": "transformer (averaged, beam8-a1)",
+      "tag": "test.averaged.beam8-a1",
+      "seeds": 3,
+      "runs": [
+        "iwslt14_transformer_s1",
+        "iwslt14_transformer_s2",
+        "iwslt14_transformer_s3"
+      ],
+      "bleu": [
+        33.12,
+        33.02,
+        33.16
+      ],
+      "chrf": [
+        56.64,
+        56.72,
+        56.82
+      ],
+      "bleu_fairseq": [
+        34.88,
+        34.75,
+        34.9
+      ],
+      "length_ratio": [
+        0.9578,
+        0.956,
+        0.9608
+      ],
+      "valid_nll": [
+        1.601766274043351,
+        1.5999870779732381,
+        1.5978657919876629
+      ],
+      "test": null,
+      "p_holm": null
+    },
+    {
+      "label": "bilstm_luong (averaged, beam8-a1)",
+      "tag": "test.averaged.beam8-a1",
+      "seeds": 3,
+      "runs": [
+        "iwslt14_bilstm_luong_s1",
+        "iwslt14_bilstm_luong_s2",
+        "iwslt14_bilstm_luong_s3"
+      ],
+      "bleu": [
+        31.96,
+        32.01,
+        32.15
+      ],
+      "chrf": [
+        55.77,
+        55.73,
+        55.85
+      ],
+      "bleu_fairseq": [
+        33.75,
+        33.8,
+        33.93
+      ],
+      "length_ratio": [
+        0.9655,
+        0.9654,
+        0.9684
+      ],
+      "valid_nll": [
+        1.7280663057495034,
+        1.728747793142201,
+        1.7325463069193952
+      ],
+      "test": {
+        "delta": -1.0598519090456904,
+        "ci": [
+          -1.3304241105388523,
+          -0.8224481604435014
+        ],
+        "p_bootstrap": 0.000999000999000999,
+        "p_permutation": 0.1
+      },
+      "p_holm": 0.001998001998001998
+    },
+    {
+      "label": "gru_bahdanau (best, beam8-a1)",
+      "tag": "test.best.beam8-a1",
+      "seeds": 3,
+      "runs": [
+        "iwslt14_gru_bahdanau_s1",
+        "iwslt14_gru_bahdanau_s2",
+        "iwslt14_gru_bahdanau_s3"
+      ],
+      "bleu": [
+        28.6,
+        29.09,
+        28.96
+      ],
+      "chrf": [
+        52.84,
+        53.07,
+        52.71
+      ],
+      "bleu_fairseq": [
+        30.63,
+        30.91,
+        30.8
+      ],
+      "length_ratio": [
+        0.9796,
+        0.9737,
+        0.9642
+      ],
+      "valid_nll": [
+        1.927997175028033,
+        1.932045425832367,
+        1.931466415540621
+      ],
+      "test": {
+        "delta": -4.216701262689963,
+        "ci": [
+          -4.565229416803576,
+          -3.862947815079767
+        ],
+        "p_bootstrap": 0.000999000999000999,
+        "p_permutation": 0.1
+      },
+      "p_holm": 0.001998001998001998
+    }
+  ],
+  "training_selection_edges": {
+    "transformer": [],
+    "bilstm_luong": [],
+    "gru_bahdanau": []
+  },
+  "training_selection": {
+    "transformer": "default",
+    "bilstm_luong": "default",
+    "gru_bahdanau": "default"
+  },
+  "tuned": [
+    {
+      "label": "transformer (default)",
+      "tag": "test.averaged.beam4",
+      "seeds": 3,
+      "runs": [
+        "iwslt14_transformer_s1",
+        "iwslt14_transformer_s2",
+        "iwslt14_transformer_s3"
+      ],
+      "bleu": [
+        32.99,
+        32.9,
+        32.96
+      ],
+      "chrf": [
+        56.5,
+        56.63,
+        56.61
+      ],
+      "bleu_fairseq": [
+        34.72,
+        34.62,
+        34.68
+      ],
+      "length_ratio": [
+        0.9535,
+        0.9522,
+        0.9571
+      ],
+      "valid_nll": [
+        1.601766274043351,
+        1.5999870779732381,
+        1.5978657919876629
+      ],
+      "test": null,
+      "p_holm": null
+    },
+    {
+      "label": "bilstm_luong (default)",
+      "tag": "test.averaged.beam4",
+      "seeds": 3,
+      "runs": [
+        "iwslt14_bilstm_luong_s1",
+        "iwslt14_bilstm_luong_s2",
+        "iwslt14_bilstm_luong_s3"
+      ],
+      "bleu": [
+        31.63,
+        31.76,
+        32.0
+      ],
+      "chrf": [
+        55.45,
+        55.48,
+        55.66
+      ],
+      "bleu_fairseq": [
+        33.42,
+        33.52,
+        33.77
+      ],
+      "length_ratio": [
+        0.9611,
+        0.9606,
+        0.9639
+      ],
+      "valid_nll": [
+        1.7280663057495034,
+        1.728747793142201,
+        1.7325463069193952
+      ],
+      "test": {
+        "delta": -1.1546134561489758,
+        "ci": [
+          -1.4434014339897332,
+          -0.8415268372849749
+        ],
+        "p_bootstrap": 0.000999000999000999,
+        "p_permutation": 0.1
+      },
+      "p_holm": 0.001998001998001998
+    },
+    {
+      "label": "gru_bahdanau (default)",
+      "tag": "test.averaged.beam4",
+      "seeds": 3,
+      "runs": [
+        "iwslt14_gru_bahdanau_s1",
+        "iwslt14_gru_bahdanau_s2",
+        "iwslt14_gru_bahdanau_s3"
+      ],
+      "bleu": [
+        0.06,
+        27.63,
+        6.84
+      ],
+      "chrf": [
+        9.26,
+        52.57,
+        26.71
+      ],
+      "bleu_fairseq": [
+        0.06,
+        29.26,
+        7.87
+      ],
+      "length_ratio": [
+        3.5433,
+        0.9189,
+        1.33
+      ],
+      "valid_nll": [
+        1.927997175028033,
+        1.932045425832367,
+        1.931466415540621
+      ],
+      "test": {
+        "delta": -21.44553353866759,
+        "ci": [
+          -32.713066931596174,
+          -5.3841072692183465
+        ],
+        "p_bootstrap": 0.000999000999000999,
+        "p_permutation": 0.1
+      },
+      "p_holm": 0.001998001998001998
+    }
+  ],
+  "sensitivity": {},
+  "decoding": {
+    "transformer": {
+      "checkpoint": "averaged",
+      "checkpoint_valid_bleu": {
+        "averaged": 34.61,
+        "best": 34.17666666666667
+      },
+      "grid": {
+        "valid.averaged.beam4": 34.61,
+        "valid.averaged.beam4-a1": 34.696666666666665,
+        "valid.averaged.beam8": 34.64666666666667,
+        "valid.averaged.beam8-a1": 34.79
+      },
+      "selected": [
+        8,
+        1.0
+      ]
+    },
+    "bilstm_luong": {
+      "checkpoint": "averaged",
+      "checkpoint_valid_bleu": {
+        "averaged": 33.38333333333333,
+        "best": 32.60666666666666
+      },
+      "grid": {
+        "valid.averaged.beam4": 33.38333333333333,
+        "valid.averaged.beam4-a1": 33.51,
+        "valid.averaged.beam8": 33.51666666666667,
+        "valid.averaged.beam8-a1": 33.65
+      },
+      "selected": [
+        8,
+        1.0
+      ]
+    },
+    "gru_bahdanau": {
+      "checkpoint": "best",
+      "checkpoint_valid_bleu": {
+        "averaged": 11.729999999999999,
+        "best": 29.936666666666667
+      },
+      "grid": {
+        "valid.best.beam4": 29.936666666666667,
+        "valid.best.beam4-a1": 29.983333333333334,
+        "valid.best.beam8": 30.14,
+        "valid.best.beam8-a1": 30.209999999999997
+      },
+      "selected": [
+        8,
+        1.0
+      ]
+    }
+  },
+  "averaging_and_search": [
+    {
+      "model": "transformer",
+      "comparison": "averaged \u2212 best (beam 4)",
+      "delta": 0.44602340834812537,
+      "ci": [
+        0.26145424912252935,
+        0.625860399523465
+      ],
+      "p_bootstrap": 0.000999000999000999,
+      "p_permutation": 0.1,
+      "p_holm": 0.005994005994005994
+    },
+    {
+      "model": "transformer",
+      "comparison": "beam 4 \u2212 greedy (best)",
+      "delta": 0.8452939520069229,
+      "ci": [
+        0.6160428084080469,
+        1.0820468503106666
+      ],
+      "p_bootstrap": 0.000999000999000999,
+      "p_permutation": 0.1,
+      "p_holm": 0.005994005994005994
+    },
+    {
+      "model": "bilstm_luong",
+      "comparison": "averaged \u2212 best (beam 4)",
+      "delta": 0.7345913009650786,
+      "ci": [
+        0.40650671763087853,
+        1.044108480911655
+      ],
+      "p_bootstrap": 0.000999000999000999,
+      "p_permutation": 0.1,
+      "p_holm": 0.005994005994005994
+    },
+    {
+      "model": "bilstm_luong",
+      "comparison": "beam 4 \u2212 greedy (best)",
+      "delta": 1.4375888694477723,
+      "ci": [
+        1.1716365002322089,
+        1.71974060414256
+      ],
+      "p_bootstrap": 0.000999000999000999,
+      "p_permutation": 0.1,
+      "p_holm": 0.005994005994005994
+    },
+    {
+      "model": "gru_bahdanau",
+      "comparison": "averaged \u2212 best (beam 4)",
+      "delta": -17.05862238171712,
+      "ci": [
+        -28.297270621971904,
+        -1.099628499703447
+      ],
+      "p_bootstrap": 0.000999000999000999,
+      "p_permutation": 0.1,
+      "p_holm": 0.005994005994005994
+    },
+    {
+      "model": "gru_bahdanau",
+      "comparison": "beam 4 \u2212 greedy (best)",
+      "delta": 1.6068694932824208,
+      "ci": [
+        1.2797881606536587,
+        1.9058413253813733
+      ],
+      "p_bootstrap": 0.000999000999000999,
+      "p_permutation": 0.1,
+      "p_holm": 0.005994005994005994
+    }
+  ],
+  "ablations": [],
+  "spearman_valid_nll_test_bleu": {
+    "rho": -0.8166666666666667,
+    "runs": 9
+  },
+  "health": [
+    {
+      "model": "transformer",
+      "configuration": "default",
+      "flags": [],
+      "final_train_nll": [
+        1.0969485851966263,
+        1.1017650192701065,
+        1.100464723131241
+      ]
+    },
+    {
+      "model": "bilstm_luong",
+      "configuration": "default",
+      "flags": [
+        "early best"
+      ],
+      "final_train_nll": [
+        1.1902680204003835,
+        1.1852888120066287,
+        1.184763210236578
+      ]
+    },
+    {
+      "model": "gru_bahdanau",
+      "configuration": "default",
+      "flags": [
+        "early best"
+      ],
+      "final_train_nll": [
+        15.777855909779188,
+        2.1883172330597302,
+        16.952452208724424
+      ]
+    }
+  ],
+  "outlier_seeds": [
+    {
+      "run": "iwslt14_gru_bahdanau_s1",
+      "bleu": 0.06,
+      "median": 6.84,
+      "model": "gru_bahdanau"
+    }
+  ],
+  "status": {
+    "completed": 9,
+    "failed": [],
+    "missing": [],
+    "pending_tasks": 0
+  }
+}
