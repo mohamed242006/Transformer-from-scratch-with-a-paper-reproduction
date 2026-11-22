@@ -1,0 +1,25 @@
+{
+  "experiment": "iwslt14_transformer",
+  "created": "2026-11-22T07:17:30+00:00",
+  "config_hash": "033aa657c08474c7066e8ec69de5a8ed76944c43ab7a1f8df3ca507a296bdfb9",
+  "code_tree_sha256": "7782ff9b735f27e893c0512ce0264796158ad636725be217565208ef20f743df",
+  "tokenizer_fingerprint": "b0c6c22a45b05ef17842a299f3e41bc7ccb971d3bfd90dab8a3858872b261989",
+  "parameters": 36665344,
+  "sessions": [
+    {
+      "start": "2026-11-22T07:17:30+00:00",
+      "end": "2026-11-22T07:49:52+00:00",
+      "status": "completed",
+      "start_update": 0,
+      "resumed_from": null,
+      "device": "NVIDIA GeForce RTX 5070 Ti",
+      "amp": "torch.float16",
+      "python": "3.14.4",
+      "torch": "2.15.0+cu132",
+      "end_update": 30000
+    }
+  ],
+  "best_valid_nll": 1.5999870779732381,
+  "best_update": 28000,
+  "slimmed": true
+}

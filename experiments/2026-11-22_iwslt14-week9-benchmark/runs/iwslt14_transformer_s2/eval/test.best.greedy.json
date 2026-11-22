@@ -1,0 +1,63 @@
+{
+  "run": "iwslt14_transformer",
+  "split": "test",
+  "checkpoint": "best",
+  "average_last": null,
+  "decode": {
+    "beam_size": 1,
+    "length_penalty": 0.6,
+    "max_len_a": 1.0,
+    "max_len_b": 50
+  },
+  "bleu": 31.51,
+  "bleu_signature": "nrefs:1|case:mixed|eff:no|tok:13a|smooth:exp|version:2.6.0",
+  "bleu_precisions": [
+    65.3,
+    39.5,
+    25.8,
+    17.2
+  ],
+  "brevity_penalty": 0.9635,
+  "length_ratio": 0.9642,
+  "bleu_lowercase": 32.26,
+  "bleu_lowercase_signature": "nrefs:1|case:lc|eff:no|tok:13a|smooth:exp|version:2.6.0",
+  "chrf": 55.36,
+  "chrf_signature": "nrefs:1|case:mixed|eff:yes|nc:6|nw:0|space:no|version:2.6.0",
+  "exact_match": 0.0399,
+  "sentences": 6750,
+  "bleu_fairseq": 33.2,
+  "bleu_fairseq_signature": "fairseq-style|moses:sacremoses-0.2.0|escape|lc|apostrophe:U+2019->'|sacrebleu tok:none|smooth:none|nrefs:1",
+  "bleu_by_length": [
+    {
+      "bucket": "0-9",
+      "sentences": 2137,
+      "bleu": 34.36
+    },
+    {
+      "bucket": "10-19",
+      "sentences": 2662,
+      "bleu": 33.04
+    },
+    {
+      "bucket": "20-29",
+      "sentences": 1177,
+      "bleu": 31.43
+    },
+    {
+      "bucket": "30-39",
+      "sentences": 455,
+      "bleu": 29.01
+    },
+    {
+      "bucket": "40+",
+      "sentences": 319,
+      "bleu": 28.48
+    }
+  ],
+  "truncated_sources": 0,
+  "decode_seconds": 6.02,
+  "sentences_per_second": 1121.6,
+  "device": "cuda",
+  "autocast": "torch.float16",
+  "parameters": 36665344
+}

@@ -31,7 +31,7 @@ data/*
 *.safetensors
 experiments/**/checkpoints/
 experiments/**/tb/
-runs/
+/runs/
 wandb/
 lightning_logs/
 
