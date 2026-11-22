@@ -151,9 +151,10 @@ Assumptions: IWSLT14 DE→EN ≈ 160k pairs ≈ 4 M target tokens per epoch at a
 
 ## 8. Training on Kaggle (multi-session, resumable)
 Notebook `notebooks/kaggle_train.ipynb` (thin wrapper around `scripts/train.py`):
-1. **Session 1:** set `EXPERIMENT` and `RUN_NAME`, keep `RESUME_FROM = None`, then *Save Version → Save & Run All (Commit)*. The data is downloaded and checksum-verified, the tokenizer is trained (its fingerprint is stored in the run), and training stops cleanly at the 11.5 h session budget if needed (exit code 3).
-2. **Session 2+:** add the previous version's **output** as an input and set `RESUME_FROM = "/kaggle/input/<output>/runs/<RUN_NAME>"`. The run directory is copied to `/kaggle/working`, its config hash and tokenizer fingerprint are verified, and training continues from the exact update, batch and random state.
-3. Each session's output (`/kaggle/working/runs/<RUN_NAME>/`) holds `config.yaml`, `metadata.json` (one entry per session), `metrics.jsonl`, `tokenizer/`, and `checkpoints/{last,last.prev,best}.pt` + `avg/`.
+1. **Cell 0:** list the runs in `RUNS` as `(experiment config, run name)` pairs. The first run is the comparison reference. `OVERRIDES` applies to new runs only, for example `["train.seed=2"]` with `*_s2` run names.
+2. **Every session:** *Save Version → Save & Run All (Commit)*. The data is downloaded and checksum-verified, and the tokenizer is trained, with its fingerprint stored in the run. Each run gets the time left in the session, and training stops cleanly at the budget if needed (exit code 3).
+3. **Resuming is automatic.** Attach the previous version's output or the `aiayn-runs` dataset as input. Each run in `RUNS` is resumed from the most advanced copy found under `/kaggle/input/**` (§9). Its config hash and tokenizer fingerprint are verified, and training continues from the exact update, batch and random state.
+4. Each session's output (`/kaggle/working/runs/<run name>/`) holds `config.yaml`, `metadata.json` (one entry per session), `metrics.jsonl`, `tokenizer/`, and `checkpoints/{last,last.prev,best}.pt` + `avg/`.
 
 Equivalent commands:
 ```bash
@@ -217,7 +218,7 @@ Locally: `python scripts/compare_runs.py --run runs/multi30k_tiny_s1 --run runs/
 More seeds: add `("configs/experiment/<exp>.yaml", "<exp>_s2")` entries with `OVERRIDES = ["train.seed=2"]`. Overrides apply to new runs only. The comparison adds a mean ± std table.
 
 ## 11. The Week 8 study (ADR-022)
-`notebooks/kaggle_study.ipynb` runs `configs/study/week8.yaml`. That is about 110 runs: 5-seed main comparison, decoding grid, training sensitivity, tuned configs and Transformer ablations. Expect about 9 T4-hours, so one or two sessions.
+`notebooks/kaggle_study.ipynb` with `STUDY = "configs/study/week8.yaml"` and `REFERENCE_RUN = "multi30k_tiny_s1"` runs the Week 8 study. That is about 110 runs: 5-seed main comparison, decoding grid, training sensitivity, tuned configs and Transformer ablations. Expect about 9 T4-hours, so one or two sessions.
 
 **Each session:**
 1. Use the same secrets as §9, GPU T4, Internet on, and **add the `aiayn-runs` dataset** as input. It holds the Week 7 seed-1 runs, which are reused.
@@ -238,9 +239,11 @@ A diverged run (for example at LR ×2) is recorded as `FAILED.json` and reported
 ## 12. Week 9: IWSLT'14 (ADR-023)
 **Phase 0** (done, no GPU): pinned data, protocols A + B, incremental decoding, study rules, pilot configs.
 
-**Phase 1** (awaiting approval), in two committed sessions:
+**Status (2026-11-22): complete.** The final results are in [results.md](results.md) Part I, and the evidence is in `experiments/2026-11-22_iwslt14-week9-benchmark/`. To check the reported numbers without a GPU, run `notebooks/reproduce_results.ipynb` locally. The steps below retrain.
+
+**Phase 1**, in two committed sessions:
 1. **Validation (~15 min).** In `notebooks/kaggle_validate.ipynb`, keep the defaults: `DATA_CONFIG = configs/data/iwslt14.yaml` and the three IWSLT models. It downloads and checks the archive, builds the splits (the counts must match), trains the 10k tokenizer (the fingerprint must match `b0c6c22a…`), and measures T4 memory and throughput for the Transformer and both RNNs (gate G4).
-2. **Pilot (~10 short runs).** In `notebooks/kaggle_study.ipynb`, keep `STUDY = "configs/study/week9_pilot.yaml"` (the default). Add as inputs:
+2. **Pilot (~10 short runs).** In `notebooks/kaggle_study.ipynb`, set `STUDY = "configs/study/week9_pilot.yaml"` and `REFERENCE_RUN = "iwslt14_pilot_transformer_s1"`. Add as inputs:
    - the `aiayn-runs` dataset;
    - **the validation notebook's output from step 1**, so `PILOT.md` includes its measurements.
 
@@ -258,6 +261,17 @@ A diverged run (for example at LR ×2) is recorded as `FAILED.json` and reported
 - Commit, then check that the memory line says PASS.
 - Attach **both** validation outputs (the full one and the GRU-only one) to the pilot. `PILOT.md` merges them, newest first.
 
-**Phase 2** (after the gate): set `peak_lr` in `configs/experiment/iwslt14_*.yaml` from the pilot, then run the 3-seed benchmark study.
+**Phase 1c and Phase 2 (done; hyperparameters frozen).** The learning rates selected at full budget (ADR-023 Amendment 3) are already in `configs/experiment/iwslt14_*.yaml`, and nothing needs editing. To rerun the 3-seed benchmark, use `notebooks/kaggle_study.ipynb` with its defaults: `STUDY = "configs/study/week9_benchmark.yaml"`, `REFERENCE_RUN = "iwslt14_transformer_s1"`. Then:
+- *Save & Run All (Commit)*, repeated with the newest `aiayn-runs` attached until `STUDY.md` says **complete**;
+- the runner trains the 9 runs (3 models × 3 seeds), selects checkpoints and decoding on validation, evaluates on test and writes `STUDY.md` and `STUDY.json`.
+
+**Expected cost on a T4** (estimate, from the T4 throughput in Amendment 1):
+- Transformer about 2.7 h per seed;
+- BiLSTM + Luong about 1.4 h per seed;
+- GRU + Bahdanau not measured on a T4. It was 1.6× slower than the Transformer on the RTX 5070 Ti, so allow about 4–5 h per seed.
+
+That is roughly **25 T4-hours plus evaluation, about 3 sessions**, close to one week's Kaggle GPU quota.
+
+**The reported benchmark was run locally** (one RTX 5070 Ti, 8.9 GPU-hours for all 24 IWSLT'14 runs) with the same configs, via `scripts/run_study.py` (README → "Reproduce the IWSLT'14 benchmark"). Retrained numbers should agree within seed noise, not bit for bit. Two things may differ: the GRU's late divergence (results.md §2.5) may hit different seeds, and the T4 uses fp16 like the local GPU.
 
 Every evaluation reports sacreBLEU (primary) and `bleu_fairseq` (tokenized lowercased, for literature comparison; ADR-023 §4).

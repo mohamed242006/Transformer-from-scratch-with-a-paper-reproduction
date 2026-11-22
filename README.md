@@ -72,12 +72,15 @@ Evidence for every IWSLT'14 number (configs, training logs, evaluations, test hy
 - **Scale:** more seeds; WMT'14 EN→DE with the base model.
 
 ## Reproduce the IWSLT'14 benchmark
+**Check the reported numbers (CPU, a few minutes, no GPU or checkpoints):** open [`notebooks/reproduce_results.ipynb`](notebooks/reproduce_results.ipynb) and *Run All*. It regenerates `STUDY.md` and `STUDY.json` from the committed evidence, verifies that they are byte-identical to the published reports, and re-scores all 36 test hypothesis files. The [notebooks guide](notebooks/README.md) maps every workflow to its notebook and script.
+
+**Retrain** (GPU, about 6 hours on a 16 GB consumer GPU; on Kaggle, use `notebooks/kaggle_study.ipynb`):
 ```bash
 python scripts/prepare_data.py --config configs/data/iwslt14.yaml                   # download + pinned SHA-256 and split counts
 python scripts/run_study.py --study configs/study/week9_benchmark.yaml --work runs  # trains and evaluates 3 models x 3 seeds (resumable)
 python scripts/analyze_study.py --study configs/study/week9_benchmark.yaml --work runs --out runs/STUDY.md
 ```
-The hyperparameters are frozen in `configs/experiment/iwslt14_{transformer,bilstm_luong,gru_bahdanau}.yaml`. Expect about 6 GPU-hours on a 16 GB consumer GPU. Running on Kaggle is covered in [docs/KAGGLE.md](docs/KAGGLE.md).
+The hyperparameters are frozen in `configs/experiment/iwslt14_{transformer,bilstm_luong,gru_bahdanau}.yaml`. Retrained results match within seed noise, not bit for bit. Running on Kaggle is covered in [docs/KAGGLE.md](docs/KAGGLE.md) §12. The Multi30k study (Part II of the results) can be retrained with `configs/study/week8.yaml`. Its run evidence is in the private `aiayn-runs` dataset, not in this repository.
 
 ## Data quickstart
 ```bash

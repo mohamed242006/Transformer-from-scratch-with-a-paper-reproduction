@@ -55,7 +55,7 @@ Status markers: **[W1]** created in Week 1 · *(Wn)* populated in that week.
 │
 ├── experiments/                    [W1] (W5+) one folder per run: metadata + metrics, no weights in git
 │
-├── notebooks/                      [W5] kaggle_validate.ipynb, kaggle_train.ipynb; [W8] kaggle_study.ipynb
+├── notebooks/                      [W5] kaggle_validate.ipynb, kaggle_train.ipynb; [W8] kaggle_study.ipynb; [W11] reproduce_results.ipynb
 │
 ├── scripts/                        [W2–W5] prepare_data, train_tokenizer, inspect_data, count_params,
 │                                   kaggle_validate, package_for_kaggle, train, evaluate,

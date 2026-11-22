@@ -48,4 +48,8 @@ This was checked when the archive was made.
 - **Validation hypotheses:** used only for selection, and recomputable from checkpoints.
 - **`benchmark.log`:** the raw runner log. It contains local absolute paths, and its content is in `metrics.jsonl` and `STUDY.md`.
 
-Regenerating `STUDY.md` with `scripts/analyze_study.py` needs the full run directories, not this archive.
+## Regenerating the study report
+`notebooks/reproduce_results.ipynb` regenerates `study/STUDY.md` and `study/STUDY.json` from this archive alone; both come out byte-identical. It also re-scores all 36 test hypothesis files. It works as follows:
+- it rebuilds the IWSLT'14 data and the tokenizer from public sources (its content fingerprint `b0c6c22a…` must equal the one recorded in every run's `metadata.json`);
+- it unpacks `runs/` into the gitignored `runs/reproduce_week9/`, decompressing the hypotheses and adding `tokenizer/` to each run;
+- it runs `scripts/analyze_study.py --study configs/study/week9_benchmark.yaml`.
